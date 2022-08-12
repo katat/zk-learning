@@ -149,3 +149,56 @@ pub fn recurse(fw: &Vec<i128>, r: &Vec<i128>, n: usize) -> i128 {
 // 			.collect(),
 // 	}
 // }
+
+pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
+	let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
+	let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
+	let bin = format!("{}{}", xbin, ybin);
+	println!("{}", bin);
+	// // println!("x: {:?}", x);
+	let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
+		.collect();
+	x
+}
+
+pub fn convert_bin_vec (bin: Vec<u32>) -> Vec<i128> {
+	bin.iter()
+		.map(|i| i128::from_str_radix(&i.to_string(), 10).unwrap())
+		.collect()
+}
+
+pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
+	let a = matrix.clone();
+	// let b = matrix.clone();
+	// let c = matrix.clone();
+
+	let len: usize = (matrix.len() as f32).sqrt() as usize;
+
+	let modulus = 5;
+	let mut total_triangles = 0;
+
+	for x in 0..len {
+		for y in 0..len {
+			let bin_xy = convert_bin(x, y, len/2);
+			let exist_xy = slow_mle(&a, &convert_bin_vec(bin_xy), modulus);
+			for z in 0..len {
+				let bin_yz = convert_bin(y, z, len/2);
+				let exist_yz = slow_mle(&a, &convert_bin_vec(bin_yz), modulus);
+
+				let bin_xz = convert_bin(x, z, len/2);
+				let exist_xz = slow_mle(&a, &convert_bin_vec(bin_xz), modulus);
+
+				let exist = exist_xy * exist_yz * exist_xz;
+				if exist != 0 {
+					println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
+				}
+				total_triangles += exist;
+				// if z != x && z != y {
+				// }
+			}
+		}
+	}
+
+	total_triangles as u32 / 6
+
+}

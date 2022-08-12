@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use rstest::rstest;
-use thaler::lagrange;
+use thaler::lagrange::{self, convert_bin, count_triangles};
 
 lazy_static! {
 	static ref F_2: Vec<i128> = Vec::from([1, 2, 1, 4]);
@@ -24,6 +24,15 @@ lazy_static! {
 		0, 1, 0, 0,
 		0, 0, 0, 0
 	]);
+	static ref F_W_1: Vec<i128> = Vec::from([
+		0, 1, 1, 0,
+		1, 0, 1, 1,
+		1, 1, 0, 1,
+		0, 1, 1, 0
+	]);
+	static ref R_W_0: Vec<i128> = convert_bin(2, 1, 2).iter()
+		.map(|i| i128::from_str_radix(&i.to_string(), 10).unwrap())
+		.collect();
 }
 
 #[rstest]
@@ -31,6 +40,7 @@ lazy_static! {
 #[case(&F_2, &R_1, 3, 5)]
 #[case(&F_2, &R_2, 4, 5)]
 #[case(&F_2, &R_3, 0, 5)]
+#[case(&F_W, &R_W_0, 1, 5)]
 fn slow_lagrange_test(
 	#[case] fw: &Vec<i128>,
 	#[case] r: &Vec<i128>,
@@ -38,6 +48,18 @@ fn slow_lagrange_test(
 	#[case] p: i128,
 ) {
 	assert_eq!(lagrange::slow_mle(fw, r, p), expected);
+
+	// let b = convert_bin(3, 1, 2);
+	// assert_eq!(b, [ 1, 1, 0, 1]);
+}
+
+#[rstest]
+#[case(&F_W_1, 2)]
+fn count_triangles_test(
+	#[case] fw: &Vec<i128>,
+	#[case] expected: u32
+) {
+	assert_eq!(count_triangles(fw), expected);
 }
 
 #[rstest]
