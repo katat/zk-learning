@@ -1,4 +1,3 @@
-use ark_bls12_381::Fr as ScalarField;
 use ark_ff::Field;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
@@ -6,11 +5,13 @@ use ark_poly::polynomial::{MVPolynomial, Polynomial};
 use ark_std::cfg_into_iter;
 use rand::Rng;
 
-pub type MultiPoly = SparsePolynomial<ScalarField, SparseTerm>;
-pub type UniPoly = UniSparsePolynomial<ScalarField>;
+use crate::small_fields::F251;
+
+pub type MultiPoly = SparsePolynomial<F251, SparseTerm>;
+pub type UniPoly = UniSparsePolynomial<F251>;
 
 // Converts i into an index in {0,1}^v
-pub fn n_to_vec(i: usize, n: usize) -> Vec<ScalarField> {
+pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
 	format!("{:0>width$}", format!("{:b}", i), width = n)
 		.chars()
 		.map(|x| if x == '1' { 1.into() } else { 0.into() })
@@ -21,7 +22,7 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<ScalarField> {
 #[derive(Debug, Clone)]
 pub struct Prover {
 	pub g: MultiPoly,
-	pub r_vec: Vec<ScalarField>,
+	pub r_vec: Vec<F251>,
 }
 
 impl Prover {
@@ -33,22 +34,28 @@ impl Prover {
 	}
 
 	// Given polynomial g, fix Xj, evaluate over xj+1
-	pub fn gen_uni_polynomial(&mut self, r: Option<ScalarField>) -> UniPoly {
+	pub fn gen_uni_polynomial(&mut self, r: Option<F251>) -> UniPoly {
 		if r.is_some() {
 			self.r_vec.push(r.unwrap());
 		}
 		let v = self.g.num_vars() - self.r_vec.len();
 		(0..(2u32.pow(v as u32 - 1))).fold(
 			UniPoly::from_coefficients_vec(vec![(0, 0u32.into())]),
-			|sum, n| sum + self.evaluate_gj(n_to_vec(n as usize, v)),
+			|sum, n| {
+				println!("v: {:?} n: {}, {:?}", v, n, n_to_vec(n as usize, v));
+				let gj = self.evaluate_gj(n_to_vec(n as usize, v));
+				println!("gj: {:?}", gj);
+				sum + gj
+			},
 		)
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
-	pub fn evaluate_gj(&self, points: Vec<ScalarField>) -> UniPoly {
+	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly {
 		cfg_into_iter!(self.g.terms()).fold(
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, (coeff, term)| {
 				let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
+				println!("term: {:?} fixed_term: {:?} coeff: {:?} coeff_eval: {:?}", term, fixed_term, coeff, coeff_eval);
 				let curr = match fixed_term {
 					None => UniPoly::from_coefficients_vec(vec![(0, *coeff * coeff_eval)]),
 					_ => UniPoly::from_coefficients_vec(vec![(
@@ -56,6 +63,7 @@ impl Prover {
 						*coeff * coeff_eval,
 					)]),
 				};
+				println!("term: {:?}", curr);
 				curr + sum
 			},
 		)
@@ -65,10 +73,11 @@ impl Prover {
 	pub fn evaluate_term(
 		&self,
 		term: &SparseTerm,
-		point: &Vec<ScalarField>,
-	) -> (ScalarField, Option<SparseTerm>) {
+		point: &Vec<F251>,
+	) -> (F251, Option<SparseTerm>) {
 		let mut fixed_term: Option<SparseTerm> = None;
-		let coeff: ScalarField =
+		let coeff: F251 =
+		// todo how the product var works?
 			cfg_into_iter!(term).fold(1u32.into(), |product, (var, power)| match *var {
 				j if j == self.r_vec.len() => {
 					fixed_term = Some(SparseTerm::new(vec![(j, *power)]));
@@ -81,7 +90,7 @@ impl Prover {
 	}
 
 	// Sum all evaluations of polynomial `g` over boolean hypercube
-	pub fn slow_sum_g(&self) -> ScalarField {
+	pub fn slow_sum_g(&self) -> F251 {
 		let v = self.g.num_vars();
 		let n = 2u32.pow(v as u32);
 		(0..n)
@@ -91,9 +100,9 @@ impl Prover {
 }
 
 // Verifier procedures
-pub fn get_r() -> Option<ScalarField> {
+pub fn get_r() -> Option<F251> {
 	let mut rng = rand::thread_rng();
-	let r: ScalarField = rng.gen();
+	let r: F251 = rng.gen();
 	Some(r)
 }
 
@@ -112,7 +121,7 @@ pub fn max_degrees(g: &MultiPoly) -> Vec<usize> {
 
 // Verify prover's claim c_1
 // Presented pedantically:
-pub fn verify(g: &MultiPoly, c_1: ScalarField) -> bool {
+pub fn verify(g: &MultiPoly, c_1: F251) -> bool {
 	// 1st round
 	let mut p = Prover::new(g);
 	let mut gi = p.gen_uni_polynomial(None);
@@ -139,7 +148,7 @@ pub fn verify(g: &MultiPoly, c_1: ScalarField) -> bool {
 	true
 }
 
-pub fn slow_verify(g: &MultiPoly, c_1: ScalarField) -> bool {
+pub fn slow_verify(g: &MultiPoly, c_1: F251) -> bool {
 	let p = Prover::new(g);
 	let manual_sum = p.slow_sum_g();
 	manual_sum == c_1

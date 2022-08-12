@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate lazy_static;
 
-use ark_bls12_381::Fr as ScalarField;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::MVPolynomial;
 use rstest::rstest;
+use thaler::small_fields::F251;
 use thaler::sumcheck;
 
 lazy_static! {
@@ -17,7 +17,7 @@ lazy_static! {
 			(1u32.into(), SparseTerm::new(vec![(1, 1), (2, 1)])),
 		],
 	);
-	static ref G_0_SUM: ScalarField = sumcheck::Prover::new(&G_0).slow_sum_g();
+	static ref G_0_SUM: F251 = sumcheck::Prover::new(&G_0).slow_sum_g();
 	// Test with a larger g
 	static ref G_1: sumcheck::MultiPoly = SparsePolynomial::from_coefficients_vec(
 		4,
@@ -28,12 +28,12 @@ lazy_static! {
 			(1u32.into(), SparseTerm::new(vec![(3, 1), (2, 1)])),
 		],
 	);
-	static ref G_1_SUM: ScalarField = sumcheck::Prover::new(&G_1).slow_sum_g();
+	static ref G_1_SUM: F251 = sumcheck::Prover::new(&G_1).slow_sum_g();
 }
 
 #[rstest]
 #[case(&G_0, &G_0_SUM)]
 #[case(&G_1, &G_1_SUM)]
-fn sumcheck_test(#[case] p: &sumcheck::MultiPoly, #[case] c: &ScalarField) {
+fn sumcheck_test(#[case] p: &sumcheck::MultiPoly, #[case] c: &F251) {
 	assert!(sumcheck::verify(&p, *c));
 }
