@@ -38,8 +38,8 @@ lazy_static! {
 #[rstest]
 #[case(&F_2, &R_0, 1)]
 #[case(&F_2, &R_1, 3)]
-#[case(&F_2, &R_2, 4)]
-#[case(&F_2, &R_3, 0)]
+#[case(&F_2, &R_2, 29)]
+#[case(&F_2, &R_3, 10)]
 #[case(&F_W, &R_W_0, 1)]
 fn slow_lagrange_test(
 	#[case] fw: &Vec<i128>,

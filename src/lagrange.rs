@@ -1,10 +1,10 @@
 use ark_ff::{Zero, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, MVPolynomial, Polynomial, evaluations};
-use crate::small_fields::F5;
+use crate::small_fields::F251;
 
 
 // One step in chi
-pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F5, SparseTerm> {
+pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F251, SparseTerm> {
 	// x * i128::from(w) + (1 - x) * (1 - i128::from(w));
 	// println!("step v+1:{}", v+1);
 
@@ -13,7 +13,7 @@ pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F5, SparseTerm> {
 	let w_minus_one = w as i128 - 1;
 	// println!("w-1: {}", w_minus_one);
 
-	let f: SparsePolynomial<F5, SparseTerm> = SparsePolynomial::from_coefficients_vec(
+	let f: SparsePolynomial<F251, SparseTerm> = SparsePolynomial::from_coefficients_vec(
 		v + 1,
 		vec![
 			//x * i128::from(w)
@@ -42,9 +42,9 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<bool> {
 
 /// Perform a naive n^2 multiplication of `self` by `other`.
 fn naive_mul(
-	cur: &SparsePolynomial<F5, SparseTerm>,
-	other: &SparsePolynomial<F5, SparseTerm>,
-) -> SparsePolynomial<F5, SparseTerm> {
+	cur: &SparsePolynomial<F251, SparseTerm>,
+	other: &SparsePolynomial<F251, SparseTerm>,
+) -> SparsePolynomial<F251, SparseTerm> {
 	if cur.is_zero() || other.is_zero() {
 		// println!("zero");
 		SparsePolynomial::zero()
@@ -69,14 +69,14 @@ fn naive_mul(
 }
 
 // Computes Chi_w(r) for all w, O(log n) operations
-pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F5, SparseTerm> {
+pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
 	// println!("chi w...");
-	let product: SparsePolynomial<F5, SparseTerm> = w
+	let product: SparsePolynomial<F251, SparseTerm> = w
 		.iter()
 		.enumerate()
 		.zip(vars)
 		.fold(
-			SparsePolynomial::from_coefficients_slice(0, &[(F5::from(1), SparseTerm::new(Vec::new()))]), 
+			SparsePolynomial::from_coefficients_slice(0, &[(F251::from(1), SparseTerm::new(Vec::new()))]), 
 			|p, ((_, w), v)| {
 				let step = chi_step(*w, *v);
 				let m = naive_mul(&p, &step);
@@ -86,7 +86,7 @@ pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F5, SparseTer
 
 	product
 
-	// let r: Vec<F5> = r.iter().map(|i| F5::from(*i)).collect();
+	// let r: Vec<F251> = r.iter().map(|i| F251::from(*i)).collect();
 
 	// let s = &product.evaluate(&r);
 	// let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
@@ -95,14 +95,14 @@ pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F5, SparseTer
 
 // Calculating the slow way, for benchmarking
 // todo return polynomial object instead
-pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F5, SparseTerm> {
-	let sum: SparsePolynomial<F5, SparseTerm> = fw
+pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
+	let sum: SparsePolynomial<F251, SparseTerm> = fw
 		.iter()
 		.enumerate()
 		.fold(
 			SparsePolynomial::from_coefficients_slice(0, &[]),
 			|sum, (i, val)| {
-				let factor = SparsePolynomial::from_coefficients_slice(0, &[(F5::from(*val), SparseTerm::new(Vec::new()))]);
+				let factor = SparsePolynomial::from_coefficients_slice(0, &[(F251::from(*val), SparseTerm::new(Vec::new()))]);
 				// [x1, x2, y1, y2]
 				sum + naive_mul(&factor, &chi_w(&n_to_vec(i, vars.len()), vars))
 			}
@@ -114,12 +114,12 @@ pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F5, 
 pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, vars: &Vec<usize>) -> i128 {
 	let fw_len = (fw.len() as f64).sqrt();
 	assert_eq!(r.len() as f64, fw_len);
-	let sum: SparsePolynomial<F5, SparseTerm> = poly_slow_mle(fw, vars);
+	let sum: SparsePolynomial<F251, SparseTerm> = poly_slow_mle(fw, vars);
 	
-	let mut r: Vec<F5> = r.iter().map(|i| F5::from(*i)).collect();
+	let mut r: Vec<F251> = r.iter().map(|i| F251::from(*i)).collect();
 
 	let diff = sum.num_vars() - r.len();
-	r.splice::<_, _>(0..0, std::iter::repeat(F5::from(0i32)).take(diff));
+	r.splice::<_, _>(0..0, std::iter::repeat(F251::from(0i32)).take(diff));
 	let s = sum.evaluate(&r);
 	let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
 	result 
@@ -199,12 +199,11 @@ pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
 	arr
 }
 
-pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
+pub fn poly_count_triangles(matrix: &Vec<i128>) -> SparsePolynomial<F251, SparseTerm> {
 	let a = matrix.clone();
 
 	let len: usize = (matrix.len() as f32).sqrt() as usize;
 
-	let mut total_triangles = 0;
 
 	// todo first get polynomial resulted from multiplied matrix MLEs, then evaluate over the coordinates
 	// /todo in every sum loop, new variables such as x, should be added, such as adding x3 to [x1, x2]
@@ -232,12 +231,20 @@ pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
 	let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
 	let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
 	let poly_exist = naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz);
+	poly_exist
+}
+
+pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
+	let poly_exist = poly_count_triangles(matrix);
+	let len: usize = (matrix.len() as f32).sqrt() as usize;
+	let var_num = (len as f32).log2() as usize;
+	let mut total_triangles = 0;
 
 	for x in 0..len {
 		for y in 0..len {
 			for z in 0..len {
 				let xyz_bin = convert_bin_vec(convert_bin_z(x, y, z, var_num));
-				let r: Vec<F5> = xyz_bin.iter().map(|i| F5::from(*i)).collect();
+				let r: Vec<F251> = xyz_bin.iter().map(|i| F251::from(*i)).collect();
 
 				let result = poly_exist.evaluate(&r);
 				let exist = i128::from_str_radix(&result.into_repr().to_string(), 16).unwrap();
