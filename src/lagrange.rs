@@ -1,5 +1,5 @@
 use ark_ff::{Zero, PrimeField};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, MVPolynomial, Polynomial};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, MVPolynomial, Polynomial, evaluations};
 use crate::small_fields::F5;
 
 
@@ -69,58 +69,73 @@ fn naive_mul(
 }
 
 // Computes Chi_w(r) for all w, O(log n) operations
-pub fn chi_w(w: &Vec<bool>, r: &Vec<i128>) -> i128 {
+pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F5, SparseTerm> {
 	// println!("chi w...");
-	assert_eq!(w.len(), r.len());
 	let product: SparsePolynomial<F5, SparseTerm> = w
 		.iter()
 		.enumerate()
+		.zip(vars)
 		.fold(
 			SparsePolynomial::from_coefficients_slice(0, &[(F5::from(1), SparseTerm::new(Vec::new()))]), 
-			|p, (i, w)| {
-				let step = chi_step(*w, i);
+			|p, ((_, w), v)| {
+				let step = chi_step(*w, *v);
 				let m = naive_mul(&p, &step);
 				m
 			}
 		);
 
-	let r: Vec<F5> = r.iter().map(|i| F5::from(*i)).collect();
+	product
 
-	let s = &product.evaluate(&r);
-	// println!("{:?}", product.terms()[0].0.into_repr());
-	// println!("{:?}", product.terms()[1].0.into_repr());
-	// println!("{:?}", product.terms()[2].0.into_repr());
-	// println!("{:?}", product.terms()[3].0.into_repr());
-	let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
-	// println!("chi w result:{:?}", result);
-	result
+	// let r: Vec<F5> = r.iter().map(|i| F5::from(*i)).collect();
+
+	// let s = &product.evaluate(&r);
+	// let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
+	// result
 }
 
 // Calculating the slow way, for benchmarking
-pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
-	assert_eq!(r.len() as f64, (fw.len() as f64).sqrt());
-	let sum: i128 = fw
+// todo return polynomial object instead
+pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F5, SparseTerm> {
+	let sum: SparsePolynomial<F5, SparseTerm> = fw
 		.iter()
 		.enumerate()
-		.map(|(i, val)| val * chi_w(&n_to_vec(i, r.len()), r))
-		.sum();
+		.fold(
+			SparsePolynomial::from_coefficients_slice(0, &[]),
+			|sum, (i, val)| {
+				let factor = SparsePolynomial::from_coefficients_slice(0, &[(F5::from(*val), SparseTerm::new(Vec::new()))]);
+				// [x1, x2, y1, y2]
+				sum + naive_mul(&factor, &chi_w(&n_to_vec(i, vars.len()), vars))
+			}
+		);
+
+	sum
+}
+
+pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, vars: &Vec<usize>) -> i128 {
+	let fw_len = (fw.len() as f64).sqrt();
+	assert_eq!(r.len() as f64, fw_len);
+	let sum: SparsePolynomial<F5, SparseTerm> = poly_slow_mle(fw, vars);
 	
-	// println!("slow mle sum {}", sum);
-	// println!("sum%p {}", sum % p);
-	sum % p
+	let mut r: Vec<F5> = r.iter().map(|i| F5::from(*i)).collect();
+
+	let diff = sum.num_vars() - r.len();
+	r.splice::<_, _>(0..0, std::iter::repeat(F5::from(0i32)).take(diff));
+	let s = sum.evaluate(&r);
+	let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
+	result 
 }
 
 // Lemma 3.7
-pub fn stream_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
-	recurse(fw, r, 2usize.pow(r.len() as u32)) % p
-}
+// pub fn stream_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
+// 	recurse(fw, r, 2usize.pow(r.len() as u32)) % p
+// }
 
-pub fn recurse(fw: &Vec<i128>, r: &Vec<i128>, n: usize) -> i128 {
-	match n {
-		0 => 0,
-		_ => recurse(fw, r, n - 1) + fw[n - 1] * chi_w(&n_to_vec(n - 1, r.len()), r),
-	}
-}
+// pub fn recurse(fw: &Vec<i128>, r: &Vec<i128>, n: usize) -> i128 {
+// 	match n {
+// 		0 => 0,
+// 		_ => recurse(fw, r, n - 1) + fw[n - 1] * chi_w(&n_to_vec(n - 1, r.len()), r),
+// 	}
+// }
 
 // // Lemm 3.8
 // pub fn dynamic_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
@@ -161,44 +176,81 @@ pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
 	x
 }
 
+pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
+	let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
+	let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
+	let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
+	let bin = format!("{}{}{}", xbin, ybin, zbin);
+	println!("{}", bin);
+	// // println!("x: {:?}", x);
+	let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
+		.collect();
+	x
+}
+
 pub fn convert_bin_vec (bin: Vec<u32>) -> Vec<i128> {
 	bin.iter()
 		.map(|i| i128::from_str_radix(&i.to_string(), 10).unwrap())
 		.collect()
 }
 
+pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
+	let arr: Vec<usize> = (0..var_num).map(|x| x + start_index).collect();
+	arr
+}
+
 pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
 	let a = matrix.clone();
-	// let b = matrix.clone();
-	// let c = matrix.clone();
 
 	let len: usize = (matrix.len() as f32).sqrt() as usize;
 
-	let modulus = 5;
 	let mut total_triangles = 0;
+
+	// todo first get polynomial resulted from multiplied matrix MLEs, then evaluate over the coordinates
+	// /todo in every sum loop, new variables such as x, should be added, such as adding x3 to [x1, x2]
+	let var_num = (len as f32).log2() as usize;
+
+	let x_indexes = gen_var_indexes(0, var_num);
+	let y_indexes = gen_var_indexes(x_indexes.last().unwrap() + 1, var_num);
+	println!("x indexes {:?}", x_indexes);
+	println!("y indexes {:?}", y_indexes);
+	let mut xy_indexes: Vec<usize> = x_indexes.clone();
+	xy_indexes.append(&mut y_indexes.clone());
+	println!("xy indexes {:?}", xy_indexes);
+
+	let z_indexes = gen_var_indexes(y_indexes.last().unwrap() + 1, var_num);
+	println!("z indexes {:?}", z_indexes);
+
+	let mut yz_indexes: Vec<usize> = y_indexes.clone();
+	yz_indexes.append(&mut z_indexes.clone());
+	println!("yz indexes {:?}", yz_indexes);
+	
+	let mut xz_indexes: Vec<usize> = x_indexes.clone();
+	xz_indexes.append(&mut z_indexes.clone());
+	println!("xz indexes {:?}", xz_indexes);
+	let poly_exist_xy = poly_slow_mle(&a, &xy_indexes);
+	let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
+	let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
+	let poly_exist = naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz);
 
 	for x in 0..len {
 		for y in 0..len {
-			let bin_xy = convert_bin(x, y, len/2);
-			let exist_xy = slow_mle(&a, &convert_bin_vec(bin_xy), modulus);
 			for z in 0..len {
-				let bin_yz = convert_bin(y, z, len/2);
-				let exist_yz = slow_mle(&a, &convert_bin_vec(bin_yz), modulus);
+				let xyz_bin = convert_bin_vec(convert_bin_z(x, y, z, var_num));
+				let r: Vec<F5> = xyz_bin.iter().map(|i| F5::from(*i)).collect();
 
-				let bin_xz = convert_bin(x, z, len/2);
-				let exist_xz = slow_mle(&a, &convert_bin_vec(bin_xz), modulus);
+				let result = poly_exist.evaluate(&r);
+				let exist = i128::from_str_radix(&result.into_repr().to_string(), 16).unwrap();
 
-				let exist = exist_xy * exist_yz * exist_xz;
 				if exist != 0 {
 					println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
 				}
 				total_triangles += exist;
-				// if z != x && z != y {
-				// }
 			}
 		}
 	}
 
+	// todo get polynomial multiplied before evaluation
 	total_triangles as u32 / 6
 
 }

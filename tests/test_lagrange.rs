@@ -36,18 +36,17 @@ lazy_static! {
 }
 
 #[rstest]
-#[case(&F_2, &R_0, 1, 5)]
-#[case(&F_2, &R_1, 3, 5)]
-#[case(&F_2, &R_2, 4, 5)]
-#[case(&F_2, &R_3, 0, 5)]
-#[case(&F_W, &R_W_0, 1, 5)]
+#[case(&F_2, &R_0, 1)]
+#[case(&F_2, &R_1, 3)]
+#[case(&F_2, &R_2, 4)]
+#[case(&F_2, &R_3, 0)]
+#[case(&F_W, &R_W_0, 1)]
 fn slow_lagrange_test(
 	#[case] fw: &Vec<i128>,
 	#[case] r: &Vec<i128>,
 	#[case] expected: i128,
-	#[case] p: i128,
 ) {
-	assert_eq!(lagrange::slow_mle(fw, r, p), expected);
+	assert_eq!(lagrange::slow_mle(fw, r, &Vec::from([0, 1, 2, 3])), expected);
 
 	// let b = convert_bin(3, 1, 2);
 	// assert_eq!(b, [ 1, 1, 0, 1]);
@@ -62,19 +61,19 @@ fn count_triangles_test(
 	assert_eq!(count_triangles(fw), expected);
 }
 
-#[rstest]
-#[case(&F_2, &R_0, 1, 5)]
-#[case(&F_2, &R_1, 3, 5)]
-#[case(&F_2, &R_2, 4, 5)]
-#[case(&F_2, &R_3, 0, 5)]
-fn stream_lagrange_test(
-	#[case] fw: &Vec<i128>,
-	#[case] r: &Vec<i128>,
-	#[case] expected: i128,
-	#[case] p: i128,
-) {
-	assert_eq!(lagrange::stream_mle(fw, r, p), expected);
-}
+// #[rstest]
+// #[case(&F_2, &R_0, 1, 5)]
+// #[case(&F_2, &R_1, 3, 5)]
+// #[case(&F_2, &R_2, 4, 5)]
+// #[case(&F_2, &R_3, 0, 5)]
+// fn stream_lagrange_test(
+// 	#[case] fw: &Vec<i128>,
+// 	#[case] r: &Vec<i128>,
+// 	#[case] expected: i128,
+// 	#[case] p: i128,
+// ) {
+// 	assert_eq!(lagrange::stream_mle(fw, r, p), expected);
+// }
 
 // #[rstest]
 // #[case(&F_2, &R_0, 1, 5)]
