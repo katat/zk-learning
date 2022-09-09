@@ -4,10 +4,10 @@
 extern crate lazy_static;
 
 extern crate test;
-use ark_bls12_381::Fr as ScalarField;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::{MVPolynomial, Polynomial};
 use test::Bencher;
+use thaler::small_fields::F251;
 use thaler::sumcheck;
 
 lazy_static! {
@@ -33,12 +33,12 @@ lazy_static! {
 			)
 		],
 	);
-	static ref G_1_SUM: ScalarField = sumcheck::Prover::new(&G_1).slow_sum_g();
+	static ref G_1_SUM: F251 = sumcheck::Prover::new(&G_1).slow_sum_g();
 }
 
 // a gi lookup table
 fn build_gi_lookup() -> Vec<sumcheck::UniPoly> {
-	let r: Option<ScalarField> = Some(2u32.into());
+	let r: Option<F251> = Some(2u32.into());
 	let mut lookup = vec![];
 	let mut p = sumcheck::Prover::new(&G_1);
 	let mut gi = p.gen_uni_polynomial(None);
@@ -51,7 +51,7 @@ fn build_gi_lookup() -> Vec<sumcheck::UniPoly> {
 }
 
 // Steps being benchmarked
-fn verifier_steps_only(gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<ScalarField>) {
+fn verifier_steps_only(gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<F251>) {
 	// initial round
 	let p = sumcheck::Prover::new(&G_1);
 	let mut gi = gi_lookup[0].clone();
@@ -77,9 +77,18 @@ fn verifier_steps_only(gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<ScalarField
 #[bench]
 fn sumcheck_test(b: &mut Bencher) {
 	let gi_lookup = build_gi_lookup();
-	let r: Option<ScalarField> = Some(2u32.into());
-
+	let r: Option<F251> = Some(2u32.into());
+	
 	b.iter(|| verifier_steps_only(&gi_lookup, r));
+}
+
+#[bench]
+fn sumcheck_last_round_test(b: &mut Bencher) {
+	let r: Option<F251> = Some(2u32.into());
+	
+	b.iter(|| {
+		G_1.evaluate(&vec![r.unwrap(); G_1.num_vars()]);
+	});
 }
 
 #[bench]
