@@ -35,11 +35,21 @@ lazy_static! {
 
 #[rstest]
 #[case(&M_1, 2)]
-fn slow_lagrange_test(
+fn naive_count_test(
 	#[case] m: &Vec<Vec<F251>>,
 	#[case] expected: i128,
 ) {
     let triangles = Triangles::new(m.to_vec());
 	assert_eq!(triangles.count(), F251::from(expected));
+}
+
+#[rstest]
+#[case(&M_1, 2)]
+fn slow_mle_count_test(
+	#[case] m: &Vec<Vec<F251>>,
+	#[case] expected: i128,
+) {
+    let triangles = Triangles::new(m.to_vec());
+	assert_eq!(triangles.count_by_mle(), expected);
 }
 
