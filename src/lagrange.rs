@@ -41,7 +41,8 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<bool> {
 }
 
 /// Perform a naive n^2 multiplication of `self` by `other`.
-fn naive_mul(
+// todo try to have this as * operator for SparsePolynomial
+pub fn naive_mul(
 	cur: &SparsePolynomial<F251, SparseTerm>,
 	other: &SparsePolynomial<F251, SparseTerm>,
 ) -> SparsePolynomial<F251, SparseTerm> {
@@ -94,7 +95,6 @@ pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseT
 }
 
 // Calculating the slow way, for benchmarking
-// todo return polynomial object instead
 pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
 	let sum: SparsePolynomial<F251, SparseTerm> = fw
 		.iter()
