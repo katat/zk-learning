@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
-use ark_poly::polynomial::{MVPolynomial, Polynomial};
+use ark_poly::polynomial::{Polynomial};
 use ark_std::cfg_into_iter;
 use rand::Rng;
 
@@ -38,7 +38,7 @@ impl Prover {
 		if r.is_some() {
 			self.r_vec.push(r.unwrap());
 		}
-		let v = self.g.num_vars() - self.r_vec.len();
+		let v = self.g.num_vars - self.r_vec.len();
 		(0..(2u32.pow(v as u32 - 1))).fold(
 			UniPoly::from_coefficients_vec(vec![(0, 0u32.into())]),
 			|sum, n| {
@@ -51,16 +51,16 @@ impl Prover {
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
 	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly {
-		cfg_into_iter!(self.g.terms()).fold(
+		cfg_into_iter!(self.g.terms.clone()).fold(
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, (coeff, term)| {
 				let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
 				// println!("term: {:?} fixed_term: {:?} coeff: {:?} coeff_eval: {:?}", term, fixed_term, coeff, coeff_eval);
 				let curr = match fixed_term {
-					None => UniPoly::from_coefficients_vec(vec![(0, *coeff * coeff_eval)]),
+					None => UniPoly::from_coefficients_vec(vec![(0, coeff * coeff_eval)]),
 					_ => UniPoly::from_coefficients_vec(vec![(
 						fixed_term.unwrap().degree(),
-						*coeff * coeff_eval,
+						coeff * coeff_eval,
 					)]),
 				};
 				// println!("term: {:?}", curr);
@@ -91,7 +91,7 @@ impl Prover {
 
 	// Sum all evaluations of polynomial `g` over boolean hypercube
 	pub fn slow_sum_g(&self) -> F251 {
-		let v = self.g.num_vars();
+		let v = self.g.num_vars;
 		let n = 2u32.pow(v as u32);
 		(0..n)
 			.map(|n| self.g.evaluate(&n_to_vec(n as usize, v)))
@@ -108,8 +108,8 @@ pub fn get_r() -> Option<F251> {
 
 // A degree look up table for all variables in g
 pub fn max_degrees(g: &MultiPoly) -> Vec<usize> {
-	let mut lookup: Vec<usize> = vec![0; g.num_vars()];
-	cfg_into_iter!(g.terms()).for_each(|(_, term)| {
+	let mut lookup: Vec<usize> = vec![0; g.num_vars];
+	cfg_into_iter!(g.terms.clone()).for_each(|(_, term)| {
 		cfg_into_iter!(term).for_each(|(var, power)| {
 			if *power > lookup[*var] {
 				lookup[*var] = *power
@@ -131,7 +131,7 @@ pub fn verify(g: &MultiPoly, c_1: F251) -> bool {
 	assert!(gi.degree() <= lookup_degree[0]);
 
 	// middle rounds
-	for j in 1..p.g.num_vars() {
+	for j in 1..p.g.num_vars {
 		let r = get_r();
 		expected_c = gi.evaluate(&r.unwrap());
 		gi = p.gen_uni_polynomial(r);

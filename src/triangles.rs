@@ -3,7 +3,7 @@ use std::{iter, ops::Div};
 use ark_ff::{Zero, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm}, Polynomial};
 
-use crate::{small_fields::{F251, to_u64}, lagrange::{poly_slow_mle, naive_mul}};
+use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}};
 
 #[derive(Debug, Clone)]
 pub struct Triangles {
@@ -13,7 +13,7 @@ pub struct Triangles {
 fn println_matrix(matrix: Vec<Vec<F251>>) {
     for i in 0..matrix.len() {
         for j in 0..matrix[i].len() {
-            print!("{} ", matrix[i][j].into_repr());
+            print!("{} ", matrix[i][j].into_bigint().as_ref()[0]);
         }
         println!("");
     }
@@ -144,7 +144,7 @@ impl Triangles {
         println!("xz indexes {:?}", xz_indexes);
 
         //clean up
-        let converted_a = a.into_iter().map(|e| to_u64(e) as i128).collect();
+        let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect();
         let poly_exist_xy = poly_slow_mle(&converted_a, &xy_indexes);
         let poly_exist_yz = poly_slow_mle(&converted_a, &yz_indexes);
         let poly_exist_xz = poly_slow_mle(&converted_a, &xz_indexes);
@@ -165,7 +165,7 @@ impl Triangles {
                     let r: Vec<F251> = xyz_bin.iter().map(|i| F251::from(*i)).collect();
     
                     let result = poly_exist.evaluate(&r);
-                    let exist = i128::from_str_radix(&result.into_repr().to_string(), 16).unwrap();
+                    let exist = result.into_bigint().as_ref()[0];
     
                     if exist != 0 {
                         println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);

@@ -4,8 +4,9 @@
 extern crate lazy_static;
 
 extern crate test;
+use ark_poly::DenseMVPolynomial;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
-use ark_poly::polynomial::{MVPolynomial, Polynomial};
+use ark_poly::polynomial::{Polynomial};
 use test::Bencher;
 use thaler::small_fields::F251;
 use thaler::sumcheck;
@@ -33,6 +34,7 @@ lazy_static! {
 			)
 		],
 	);
+	
 	static ref G_1_SUM: F251 = sumcheck::Prover::new(&G_1).slow_sum_g();
 }
 
@@ -43,7 +45,7 @@ fn build_gi_lookup() -> Vec<sumcheck::UniPoly> {
 	let mut p = sumcheck::Prover::new(&G_1);
 	let mut gi = p.gen_uni_polynomial(None);
 	lookup.push(gi.clone());
-	for _ in 1..p.g.num_vars() {
+	for _ in 1..p.g.num_vars {
 		gi = p.gen_uni_polynomial(r);
 		lookup.push(gi.clone());
 	}
@@ -60,7 +62,7 @@ fn verifier_steps_only(gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<F251>) {
 	let lookup_degree = sumcheck::max_degrees(&G_1);
 	assert!(gi.degree() <= lookup_degree[0]);
 	// middle rounds
-	for j in 1..p.g.num_vars() {
+	for j in 1..p.g.num_vars {
 		expected_c = gi.evaluate(&r.unwrap());
 		gi = gi_lookup[j].clone();
 		let new_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
@@ -69,7 +71,7 @@ fn verifier_steps_only(gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<F251>) {
 	}
 	// final round
 	expected_c = gi.evaluate(&r.unwrap());
-	let new_c = G_1.evaluate(&vec![r.unwrap(); p.g.num_vars()]);
+	let new_c = G_1.evaluate(&vec![r.unwrap(); p.g.num_vars]);
 	assert_eq!(expected_c, new_c);
 }
 

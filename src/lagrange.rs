@@ -1,5 +1,5 @@
 use ark_ff::{Zero, PrimeField};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, MVPolynomial, Polynomial, evaluations};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial, evaluations, DenseMVPolynomial};
 use crate::small_fields::F251;
 
 
@@ -89,7 +89,7 @@ pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseT
 
 	// let r: Vec<F251> = r.iter().map(|i| F251::from(*i)).collect();
 
-	// let s = &product.evaluate(&r);
+	// lets = &product.evaluate(&r);
 	// let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
 	// result
 }
@@ -111,7 +111,7 @@ pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F251
 	sum
 }
 
-pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, vars: &Vec<usize>) -> i128 {
+pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, vars: &Vec<usize>) -> F251 {
 	let fw_len = (fw.len() as f64).sqrt();
 	assert_eq!(r.len() as f64, fw_len);
 	let sum: SparsePolynomial<F251, SparseTerm> = poly_slow_mle(fw, vars);
@@ -120,9 +120,10 @@ pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, vars: &Vec<usize>) -> i128 {
 
 	let diff = sum.num_vars() - r.len();
 	r.splice::<_, _>(0..0, std::iter::repeat(F251::from(0i32)).take(diff));
-	let s = sum.evaluate(&r);
-	let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
-	result 
+	let s: F251 = sum.evaluate(&r);
+	s
+	// let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
+	// result 
 }
 
 // Lemma 3.7
@@ -246,8 +247,9 @@ pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
 				let xyz_bin = convert_bin_vec(convert_bin_z(x, y, z, var_num));
 				let r: Vec<F251> = xyz_bin.iter().map(|i| F251::from(*i)).collect();
 
-				let result = poly_exist.evaluate(&r);
-				let exist = i128::from_str_radix(&result.into_repr().to_string(), 16).unwrap();
+				let result: F251 = poly_exist.evaluate(&r);
+				
+				let exist = result.into_bigint().as_ref()[0];
 
 				if exist != 0 {
 					println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
