@@ -1,6 +1,4 @@
-use ark_ff::{Fp64, MontBackend, MontConfig, One, PrimeField};
-
-
+use ark_ff::{Fp64, MontBackend, MontConfig};
 
 #[derive(MontConfig)]
 #[modulus = "251"]

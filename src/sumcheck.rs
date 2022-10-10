@@ -51,7 +51,7 @@ impl Prover {
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
 	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly {
-		cfg_into_iter!(self.g.terms.clone()).fold(
+		self.g.terms.clone().into_iter().fold(
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, (coeff, term)| {
 				let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
@@ -77,7 +77,6 @@ impl Prover {
 	) -> (F251, Option<SparseTerm>) {
 		let mut fixed_term: Option<SparseTerm> = None;
 		let coeff: F251 =
-		// todo how the product var works?
 			cfg_into_iter!(term).fold(1u32.into(), |product, (var, power)| match *var {
 				j if j == self.r_vec.len() => {
 					fixed_term = Some(SparseTerm::new(vec![(j, *power)]));

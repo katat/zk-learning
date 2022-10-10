@@ -11,12 +11,12 @@ pub struct Triangles {
 }
 
 fn println_matrix(matrix: Vec<Vec<F251>>) {
-    for i in 0..matrix.len() {
-        for j in 0..matrix[i].len() {
-            //print!("{} ", matrix[i][j].into_bigint().as_ref()[0]);
+    (0..matrix.len()).for_each(|i| {
+        for _j in 0..matrix[i].len() {
+            // print!("{} ", matrix[i][j].into_bigint().as_ref()[0]);
         }
         //println!("");
-    }
+    });
 }
 
 
@@ -110,17 +110,12 @@ impl Triangles {
     
     pub fn convert_bin_vec (bin: Vec<u32>) -> Vec<i128> {
         bin.iter()
-            .map(|i| i128::from_str_radix(&i.to_string(), 10).unwrap())
+            .map(|i| i.to_string().parse::<i128>().unwrap())
             .collect()
     }
     
     pub fn poly_count_triangles(&self) -> SparsePolynomial<F251, SparseTerm> {
         let a: Vec<F251> = self.flatten();
-        // let a = matrix.into_iter().flatten().collect::<Vec<F251>>();
-    
-        let len = self.size();
-        //println!("len {}", len);
-    
     
         let var_num = self.var_num();
     
@@ -132,26 +127,26 @@ impl Triangles {
         xy_indexes.append(&mut y_indexes.clone());
         //println!("xy indexes {:?}", xy_indexes);
     
-        let z_indexes = Triangles::gen_var_indexes(y_indexes.last().unwrap() + 1, var_num);
+        let mut z_indexes = Triangles::gen_var_indexes(y_indexes.last().unwrap() + 1, var_num);
         //println!("z indexes {:?}", z_indexes);
     
-        let mut yz_indexes: Vec<usize> = y_indexes.clone();
+        let mut yz_indexes: Vec<usize> = y_indexes;
         yz_indexes.append(&mut z_indexes.clone());
         //println!("yz indexes {:?}", yz_indexes);
         
-        let mut xz_indexes: Vec<usize> = x_indexes.clone();
-        xz_indexes.append(&mut z_indexes.clone());
+        let mut xz_indexes: Vec<usize> = x_indexes;
+        xz_indexes.append(&mut z_indexes);
         //println!("xz indexes {:?}", xz_indexes);
 
         //clean up
-        let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect();
+        
+        let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect::<Vec<i128>>();
         let poly_exist_xy = poly_slow_mle(&converted_a, &xy_indexes);
         let poly_exist_yz = poly_slow_mle(&converted_a, &yz_indexes);
         let poly_exist_xz = poly_slow_mle(&converted_a, &xz_indexes);
 
         println!("poly xz {}", poly_exist_xz.terms.len());
-        let poly_exist = naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz);
-        poly_exist
+        naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz)
     }
 
     pub fn count_by_mle(&self) -> i128 {

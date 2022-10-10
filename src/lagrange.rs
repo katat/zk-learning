@@ -1,5 +1,5 @@
 use ark_ff::{Zero, PrimeField};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial, evaluations, DenseMVPolynomial};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial, DenseMVPolynomial};
 use crate::small_fields::F251;
 
 
@@ -70,7 +70,7 @@ pub fn naive_mul(
 }
 
 // Computes Chi_w(r) for all w, O(log n) operations
-pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
+pub fn chi_w(w: &[bool], vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
 	// //println!("chi w...");
 	let product: SparsePolynomial<F251, SparseTerm> = w
 		.iter()
@@ -80,8 +80,7 @@ pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseT
 			SparsePolynomial::from_coefficients_slice(0, &[(F251::from(1), SparseTerm::new(Vec::new()))]), 
 			|p, ((_, w), v)| {
 				let step = chi_step(*w, *v);
-				let m = naive_mul(&p, &step);
-				m
+				naive_mul(&p, &step)
 			}
 		);
 
@@ -95,7 +94,7 @@ pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseT
 }
 
 // Calculating the slow way, for benchmarking
-pub fn poly_slow_mle(fw: &Vec<i128>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
+pub fn poly_slow_mle(fw: &[i128], vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
 	let sum: SparsePolynomial<F251, SparseTerm> = fw
 		.iter()
 		.enumerate()

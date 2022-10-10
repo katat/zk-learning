@@ -40,9 +40,10 @@ fn build_gi_lookup() -> Vec<sumcheck::UniPoly> {
 	let r: Option<F251> = Some(2u32.into());
 	let mut lookup = vec![];
 	let mut p = sumcheck::Prover::new(&G_1);
+	// OVERHEAD
 	let mut gi = p.gen_uni_polynomial(None);
 	lookup.push(gi.clone());
-	for i in 1..p.g.num_vars {
+	for _ in 1..p.g.num_vars {
 		gi = p.gen_uni_polynomial(r);
 		lookup.push(gi.clone());
 	}
@@ -57,21 +58,21 @@ fn verifier_steps_only(p: &sumcheck::Prover, gi_lookup: &Vec<sumcheck::UniPoly>,
 	assert_eq!(*G_1_SUM, expected_c);
 	// println!("g1 terms {}", G_1.terms.len());
 	// OVERHEAD
-	// let lookup_degree = sumcheck::max_degrees(&G_1);
-	// assert!(gi.degree() <= lookup_degree[0]);
+	let lookup_degree = sumcheck::max_degrees(&G_1);
+	assert!(gi.degree() <= lookup_degree[0]);
 	// middle rounds
 	for j in 1..p.g.num_vars {
 		expected_c = gi.evaluate(&r.unwrap());
 		gi = gi_lookup[j].clone();
 		let new_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
 		assert_eq!(expected_c, new_c);
-		// assert!(gi.degree() <= lookup_degree[j]);
+		assert!(gi.degree() <= lookup_degree[j]);
 	}
 	// final round
 	expected_c = gi.evaluate(&r.unwrap());
 	// OVERHEAD
 	let new_c = G_1.evaluate(&vec![r.unwrap(); p.g.num_vars]);
-	// assert_eq!(expected_c, new_c);
+	assert_eq!(expected_c, new_c);
 }
 
 // Verifier benchmark
