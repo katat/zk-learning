@@ -26,7 +26,7 @@ fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
         row.push(v);
     }
 
-    // println!("a3 {:#?}", matrix);
+    // //println!("a3 {:#?}", matrix);
 
     matrix
 }
@@ -73,7 +73,7 @@ fn naive_count(b: &mut Bencher) {
 fn count_in_mle(b: &mut Bencher) {
     let triangles = Triangles::new(M_1.to_vec());
 	let mle = triangles.poly_count_triangles();
-	println!("mle var {}", mle.degree());
+	//println!("mle var {}", mle.degree());
 	let points = triangles.gen_points();
 	
 	b.iter(|| {
@@ -81,12 +81,12 @@ fn count_in_mle(b: &mut Bencher) {
 	});
 }
 
-fn println_matrix(matrix: Vec<Vec<F251>>) {
+fn //println_matrix(matrix: Vec<Vec<F251>>) {
     for i in 0..matrix.len() {
         for j in 0..matrix[i].len() {
-            print!("{} ", matrix[i][j].into_repr());
+            //print!("{} ", matrix[i][j].into_repr());
         }
-        println!("");
+        //println!("");
     }
 }
 

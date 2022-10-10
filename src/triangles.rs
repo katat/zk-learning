@@ -13,9 +13,9 @@ pub struct Triangles {
 fn println_matrix(matrix: Vec<Vec<F251>>) {
     for i in 0..matrix.len() {
         for j in 0..matrix[i].len() {
-            print!("{} ", matrix[i][j].into_bigint().as_ref()[0]);
+            //print!("{} ", matrix[i][j].into_bigint().as_ref()[0]);
         }
-        println!("");
+        //println!("");
     }
 }
 
@@ -51,19 +51,19 @@ impl Triangles {
                 let mut elm = F251::zero();
                 for k in 0..size {
                     elm += self.matrix[i][k] * matrix[k][j];
-                    println!("{}", matrix[k][j]);
+                    // println!("{}", matrix[k][j]);
                 }
                 result_matrix[i][j] = elm;
             }
         }
-        println!("matrix a:");
-        println_matrix(self.matrix.clone());
+        // println!("matrix a:");
+        // println_matrix(self.matrix.clone());
 
-        println!("matrix b:");
-        println_matrix(matrix);
+        // println!("matrix b:");
+        // println_matrix(matrix);
 
-        println!("matrix c:");
-        println_matrix(result_matrix.clone());
+        // println!("matrix c:");
+        // println_matrix(result_matrix.clone());
 
         result_matrix
     }
@@ -89,8 +89,8 @@ impl Triangles {
         let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
         let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
         let bin = format!("{}{}", xbin, ybin);
-        println!("{}", bin);
-        // // println!("x: {:?}", x);
+        //println!("{}", bin);
+        // // //println!("x: {:?}", x);
         let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
             .collect();
         x
@@ -101,8 +101,8 @@ impl Triangles {
         let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
         let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
         let bin = format!("{}{}{}", xbin, ybin, zbin);
-        println!("{}", bin);
-        // // println!("x: {:?}", x);
+        //println!("{}", bin);
+        // // //println!("x: {:?}", x);
         let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
             .collect();
         x
@@ -119,35 +119,37 @@ impl Triangles {
         // let a = matrix.into_iter().flatten().collect::<Vec<F251>>();
     
         let len = self.size();
-        println!("len {}", len);
+        //println!("len {}", len);
     
     
         let var_num = self.var_num();
     
         let x_indexes = Triangles::gen_var_indexes(0, var_num);
         let y_indexes = Triangles::gen_var_indexes(x_indexes.last().unwrap() + 1, var_num);
-        println!("x indexes {:?}", x_indexes);
-        println!("y indexes {:?}", y_indexes);
+        //println!("x indexes {:?}", x_indexes);
+        //println!("y indexes {:?}", y_indexes);
         let mut xy_indexes: Vec<usize> = x_indexes.clone();
         xy_indexes.append(&mut y_indexes.clone());
-        println!("xy indexes {:?}", xy_indexes);
+        //println!("xy indexes {:?}", xy_indexes);
     
         let z_indexes = Triangles::gen_var_indexes(y_indexes.last().unwrap() + 1, var_num);
-        println!("z indexes {:?}", z_indexes);
+        //println!("z indexes {:?}", z_indexes);
     
         let mut yz_indexes: Vec<usize> = y_indexes.clone();
         yz_indexes.append(&mut z_indexes.clone());
-        println!("yz indexes {:?}", yz_indexes);
+        //println!("yz indexes {:?}", yz_indexes);
         
         let mut xz_indexes: Vec<usize> = x_indexes.clone();
         xz_indexes.append(&mut z_indexes.clone());
-        println!("xz indexes {:?}", xz_indexes);
+        //println!("xz indexes {:?}", xz_indexes);
 
         //clean up
         let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect();
         let poly_exist_xy = poly_slow_mle(&converted_a, &xy_indexes);
         let poly_exist_yz = poly_slow_mle(&converted_a, &yz_indexes);
         let poly_exist_xz = poly_slow_mle(&converted_a, &xz_indexes);
+
+        println!("poly xz {}", poly_exist_xz.terms.len());
         let poly_exist = naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz);
         poly_exist
     }
@@ -168,7 +170,7 @@ impl Triangles {
                     let exist = result.into_bigint().as_ref()[0];
     
                     if exist != 0 {
-                        println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
+                        //println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
                     }
                     total_triangles += exist;
                 }

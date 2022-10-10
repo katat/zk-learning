@@ -6,12 +6,12 @@ use crate::small_fields::F251;
 // One step in chi
 pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F251, SparseTerm> {
 	// x * i128::from(w) + (1 - x) * (1 - i128::from(w));
-	// println!("step v+1:{}", v+1);
+	// //println!("step v+1:{}", v+1);
 
 	let one_minus_w = (1 - (w as i128)).into();
-	// println!("1-w: {}", one_minus_w);
+	// //println!("1-w: {}", one_minus_w);
 	let w_minus_one = w as i128 - 1;
-	// println!("w-1: {}", w_minus_one);
+	// //println!("w-1: {}", w_minus_one);
 
 	let f: SparsePolynomial<F251, SparseTerm> = SparsePolynomial::from_coefficients_vec(
 		v + 1,
@@ -25,7 +25,7 @@ pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F251, SparseTerm> {
 		],
 	);
 
-	// println!("2nd term coeff: {:?}", f.terms()[1]);
+	// //println!("2nd term coeff: {:?}", f.terms()[1]);
 
 	f
 }
@@ -33,10 +33,10 @@ pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F251, SparseTerm> {
 // Converts i into an index in {0,1}^v, used to retrieves f evaluations
 pub fn n_to_vec(i: usize, n: usize) -> Vec<bool> {
 	let x = format!("{:0>width$}", format!("{:b}", i), width = n);
-	// println!("x: {:?}", x);
+	// //println!("x: {:?}", x);
 	let x: Vec<bool> = x.chars().map(|x| x == '1')
 		.collect();
-	// println!("x: {:?}, i: {:?}, n: {:?}", x, i, n);
+	// //println!("x: {:?}, i: {:?}, n: {:?}", x, i, n);
 	x
 }
 
@@ -47,7 +47,7 @@ pub fn naive_mul(
 	other: &SparsePolynomial<F251, SparseTerm>,
 ) -> SparsePolynomial<F251, SparseTerm> {
 	if cur.is_zero() || other.is_zero() {
-		// println!("zero");
+		// //println!("zero");
 		SparsePolynomial::zero()
 	} else {
 		let mut result_terms = Vec::new();
@@ -60,7 +60,7 @@ pub fn naive_mul(
 				// let mut term = cur_term.0.clone();
 				// term.extend(other_term.0.clone());
 				let coeff = *cur_coeff * *other_coeff;
-				// println!("naive mul coeff: {}, cur_coeff: {}, other_coeff: {}", coeff, cur_coeff, other_coeff);
+				// //println!("naive mul coeff: {}, cur_coeff: {}, other_coeff: {}", coeff, cur_coeff, other_coeff);
 				result_terms.push((coeff, SparseTerm::new(term)));
 			}
 		}
@@ -71,7 +71,7 @@ pub fn naive_mul(
 
 // Computes Chi_w(r) for all w, O(log n) operations
 pub fn chi_w(w: &Vec<bool>, vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
-	// println!("chi w...");
+	// //println!("chi w...");
 	let product: SparsePolynomial<F251, SparseTerm> = w
 		.iter()
 		.enumerate()
@@ -170,8 +170,8 @@ pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
 	let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
 	let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
 	let bin = format!("{}{}", xbin, ybin);
-	println!("{}", bin);
-	// // println!("x: {:?}", x);
+	//println!("{}", bin);
+	// // //println!("x: {:?}", x);
 	let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
 		.collect();
 	x
@@ -182,8 +182,8 @@ pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
 	let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
 	let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
 	let bin = format!("{}{}{}", xbin, ybin, zbin);
-	println!("{}", bin);
-	// // println!("x: {:?}", x);
+	//println!("{}", bin);
+	// // //println!("x: {:?}", x);
 	let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
 		.collect();
 	x
@@ -212,22 +212,22 @@ pub fn poly_count_triangles(matrix: &Vec<i128>) -> SparsePolynomial<F251, Sparse
 
 	let x_indexes = gen_var_indexes(0, var_num);
 	let y_indexes = gen_var_indexes(x_indexes.last().unwrap() + 1, var_num);
-	println!("x indexes {:?}", x_indexes);
-	println!("y indexes {:?}", y_indexes);
+	//println!("x indexes {:?}", x_indexes);
+	//println!("y indexes {:?}", y_indexes);
 	let mut xy_indexes: Vec<usize> = x_indexes.clone();
 	xy_indexes.append(&mut y_indexes.clone());
-	println!("xy indexes {:?}", xy_indexes);
+	//println!("xy indexes {:?}", xy_indexes);
 
 	let z_indexes = gen_var_indexes(y_indexes.last().unwrap() + 1, var_num);
-	println!("z indexes {:?}", z_indexes);
+	//println!("z indexes {:?}", z_indexes);
 
 	let mut yz_indexes: Vec<usize> = y_indexes.clone();
 	yz_indexes.append(&mut z_indexes.clone());
-	println!("yz indexes {:?}", yz_indexes);
+	//println!("yz indexes {:?}", yz_indexes);
 	
 	let mut xz_indexes: Vec<usize> = x_indexes.clone();
 	xz_indexes.append(&mut z_indexes.clone());
-	println!("xz indexes {:?}", xz_indexes);
+	//println!("xz indexes {:?}", xz_indexes);
 	let poly_exist_xy = poly_slow_mle(&a, &xy_indexes);
 	let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
 	let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);

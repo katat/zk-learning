@@ -42,9 +42,9 @@ impl Prover {
 		(0..(2u32.pow(v as u32 - 1))).fold(
 			UniPoly::from_coefficients_vec(vec![(0, 0u32.into())]),
 			|sum, n| {
-				// println!("v: {:?} n: {}, {:?}", v, n, n_to_vec(n as usize, v));
+				// //println!("v: {:?} n: {}, {:?}", v, n, n_to_vec(n as usize, v));
 				let gj = self.evaluate_gj(n_to_vec(n as usize, v));
-				// println!("gj: {:?}", gj);
+				// //println!("gj: {:?}", gj);
 				sum + gj
 			},
 		)
@@ -55,7 +55,7 @@ impl Prover {
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, (coeff, term)| {
 				let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
-				// println!("term: {:?} fixed_term: {:?} coeff: {:?} coeff_eval: {:?}", term, fixed_term, coeff, coeff_eval);
+				// //println!("term: {:?} fixed_term: {:?} coeff: {:?} coeff_eval: {:?}", term, fixed_term, coeff, coeff_eval);
 				let curr = match fixed_term {
 					None => UniPoly::from_coefficients_vec(vec![(0, coeff * coeff_eval)]),
 					_ => UniPoly::from_coefficients_vec(vec![(
@@ -63,7 +63,7 @@ impl Prover {
 						coeff * coeff_eval,
 					)]),
 				};
-				// println!("term: {:?}", curr);
+				// //println!("term: {:?}", curr);
 				curr + sum
 			},
 		)

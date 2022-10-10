@@ -19,7 +19,7 @@ fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
         row.push(v);
     }
 
-    println!("a3 {:#?}", matrix);
+    //println!("a3 {:#?}", matrix);
 
     matrix
 }
