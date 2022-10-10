@@ -6,8 +6,13 @@ use ark_poly::{multivariate::{SparsePolynomial, SparseTerm}, Polynomial};
 use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}};
 
 #[derive(Debug, Clone)]
+pub struct Matrix {
+    vec: Vec<Vec<F251>>
+}
+
+#[derive(Debug, Clone)]
 pub struct Triangles {
-	pub matrix: Vec<Vec<F251>>,
+	pub matrix: Matrix,
 }
 
 fn println_matrix(matrix: Vec<Vec<F251>>) {
@@ -19,53 +24,56 @@ fn println_matrix(matrix: Vec<Vec<F251>>) {
     });
 }
 
-
-// todo split into triangles_mle and triangles_matrix traits?
-impl Triangles {
-    //todo make Vec<Vec<F251>> type generic
-    pub fn new(matrix: Vec<Vec<F251>>) -> Self {
-        Triangles {
-            matrix: matrix.clone()
+impl Matrix {
+    pub fn new(m: Vec<Vec<F251>>) -> Self {
+        Matrix {
+            vec: m
         }
     }
-
     pub fn flatten(&self) -> Vec<F251>{
-        self.matrix.iter().flatten().cloned().collect()
+        self.vec.iter().flatten().cloned().collect()
     }
 
     pub fn size(&self) -> usize{
-        let len: usize = (self.flatten().len() as f32).sqrt() as usize;
-        len
+        (self.flatten().len() as f32).sqrt() as usize
     }
 
     pub fn var_num(&self) -> usize {
         (self.size() as f32).log2() as usize
     }
 
-    pub fn multiply(&self, matrix: Vec<Vec<F251>>) -> Vec<Vec<F251>> {
-        let size = self.matrix.len();
+    pub fn get(&self, x: usize, y: usize) -> F251 {
+        self.vec[x][y]
+    }
+}
+
+// todo split into triangles_mle and triangles_matrix traits?
+impl Triangles {
+    //todo make Vec<Vec<F251>> type generic
+    pub fn new(matrix: Vec<Vec<F251>>) -> Self {
+        Triangles {
+            matrix: Matrix { vec: matrix }
+        }
+    }
+
+    pub fn multiply(&self, matrix: Matrix) -> Matrix {
+        let size = self.matrix.size();
         let row: Vec<F251> = iter::repeat(F251::zero()).take(size).collect();
         let mut result_matrix: Vec<Vec<F251>> = iter::repeat(row).take(size).collect();
         for i in 0..size {
             for j in 0..size {
                 let mut elm = F251::zero();
                 for k in 0..size {
-                    elm += self.matrix[i][k] * matrix[k][j];
+                    elm += self.matrix.get(i, k) * matrix.get(k, j);
                     // println!("{}", matrix[k][j]);
                 }
                 result_matrix[i][j] = elm;
             }
         }
-        // println!("matrix a:");
-        // println_matrix(self.matrix.clone());
 
-        // println!("matrix b:");
-        // println_matrix(matrix);
-
-        // println!("matrix c:");
-        // println_matrix(result_matrix.clone());
-
-        result_matrix
+        Matrix {
+            vec: result_matrix
+        }
     }
 
     pub fn count(&self) -> F251 {
@@ -73,8 +81,8 @@ impl Triangles {
         let a3 = self.multiply(a2);
         let mut number = F251::zero();
 
-        for i in 0..a3.len() {
-            number += a3[i][i];
+        for i in 0..a3.size() {
+            number += a3.get(i, i);
         }
 
         number.div(F251::from(6))
@@ -115,28 +123,26 @@ impl Triangles {
     }
     
     pub fn poly_count_triangles(&self) -> SparsePolynomial<F251, SparseTerm> {
-        let a: Vec<F251> = self.flatten();
+        let a: Vec<F251> = self.matrix.flatten();
     
-        let var_num = self.var_num();
+        let var_num = self.matrix.var_num();
     
-        let x_indexes = Triangles::gen_var_indexes(0, var_num);
-        let y_indexes = Triangles::gen_var_indexes(x_indexes.last().unwrap() + 1, var_num);
-        //println!("x indexes {:?}", x_indexes);
-        //println!("y indexes {:?}", y_indexes);
+        // encapsulate them as first/second/third...
+        let x_start_index = 0;
+        let y_start_index = var_num;
+        let z_start_index = var_num * 2;
+        let x_indexes = Triangles::gen_var_indexes(x_start_index, var_num);
+        let y_indexes = Triangles::gen_var_indexes(y_start_index, var_num);
         let mut xy_indexes: Vec<usize> = x_indexes.clone();
         xy_indexes.append(&mut y_indexes.clone());
-        //println!("xy indexes {:?}", xy_indexes);
     
-        let mut z_indexes = Triangles::gen_var_indexes(y_indexes.last().unwrap() + 1, var_num);
-        //println!("z indexes {:?}", z_indexes);
+        let mut z_indexes = Triangles::gen_var_indexes(z_start_index, var_num);
     
         let mut yz_indexes: Vec<usize> = y_indexes;
         yz_indexes.append(&mut z_indexes.clone());
-        //println!("yz indexes {:?}", yz_indexes);
         
         let mut xz_indexes: Vec<usize> = x_indexes;
         xz_indexes.append(&mut z_indexes);
-        //println!("xz indexes {:?}", xz_indexes);
 
         //clean up
         
@@ -151,8 +157,8 @@ impl Triangles {
 
     pub fn count_by_mle(&self) -> i128 {
         let poly_exist = self.poly_count_triangles();
-        let len = self.size();
-        let var_num = self.var_num();
+        let len = self.matrix.size();
+        let var_num = self.matrix.var_num();
         let mut total_triangles = 0;
     
         for x in 0..len {
