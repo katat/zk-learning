@@ -1,4 +1,5 @@
 use ark_ff::Field;
+use ark_ff::{One};
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
@@ -18,15 +19,35 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
 		.collect()
 }
 
+pub trait SumCheckPolynomial<F> {
+    fn terms(&self) -> Vec<(F, SparseTerm)>;
+    fn num_vars(&self) -> usize;
+    fn evaluate(&self, point: &Vec<F>) -> F;
+}
+
+impl SumCheckPolynomial<F251> for SparsePolynomial<F251, SparseTerm> {
+    fn terms(&self) -> Vec<(F251, SparseTerm)> {
+		self.terms.to_vec()
+    }
+
+    fn num_vars(&self) -> usize {
+		self.num_vars
+    }
+
+    fn evaluate(&self, point: &Vec<F251>) -> F251 {
+        Polynomial::evaluate(self, point)
+    }
+}
+
 // Simulates memory of a single prover instance
 #[derive(Debug, Clone)]
-pub struct Prover {
-	pub g: MultiPoly,
+pub struct Prover<P: SumCheckPolynomial<F251>> {
+	pub g: P,
 	pub r_vec: Vec<F251>,
 }
 
-impl Prover {
-	pub fn new(g: &MultiPoly) -> Self {
+impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
+	pub fn new(g: &P) -> Self {
 		Prover {
 			g: g.clone(),
 			r_vec: vec![],
@@ -38,20 +59,18 @@ impl Prover {
 		if r.is_some() {
 			self.r_vec.push(r.unwrap());
 		}
-		let v = self.g.num_vars - self.r_vec.len();
+		let v = self.g.num_vars() - self.r_vec.len();
 		(0..(2u32.pow(v as u32 - 1))).fold(
 			UniPoly::from_coefficients_vec(vec![(0, 0u32.into())]),
 			|sum, n| {
-				// //println!("v: {:?} n: {}, {:?}", v, n, n_to_vec(n as usize, v));
 				let gj = self.evaluate_gj(n_to_vec(n as usize, v));
-				// //println!("gj: {:?}", gj);
 				sum + gj
 			},
 		)
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
 	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly {
-		self.g.terms.clone().into_iter().fold(
+		self.g.terms().clone().into_iter().fold(
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, (coeff, term)| {
 				let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
@@ -90,7 +109,7 @@ impl Prover {
 
 	// Sum all evaluations of polynomial `g` over boolean hypercube
 	pub fn slow_sum_g(&self) -> F251 {
-		let v = self.g.num_vars;
+		let v = self.g.num_vars();
 		let n = 2u32.pow(v as u32);
 		(0..n)
 			.map(|n| self.g.evaluate(&n_to_vec(n as usize, v)))
@@ -100,15 +119,16 @@ impl Prover {
 
 // Verifier procedures
 pub fn get_r() -> Option<F251> {
-	let mut rng = rand::thread_rng();
-	let r: F251 = rng.gen();
+	// let mut rng = rand::thread_rng();
+	// let r: F251 = rng.gen();
+	let r: F251 = F251::one();
 	Some(r)
 }
 
 // A degree look up table for all variables in g
-pub fn max_degrees(g: &MultiPoly) -> Vec<usize> {
-	let mut lookup: Vec<usize> = vec![0; g.num_vars];
-	cfg_into_iter!(g.terms.clone()).for_each(|(_, term)| {
+pub fn max_degrees<P: SumCheckPolynomial<F251>>(g: &P) -> Vec<usize> {
+	let mut lookup: Vec<usize> = vec![0; g.num_vars()];
+	cfg_into_iter!(g.terms().clone()).for_each(|(_, term)| {
 		cfg_into_iter!(term).for_each(|(var, power)| {
 			if *power > lookup[*var] {
 				lookup[*var] = *power
@@ -120,17 +140,17 @@ pub fn max_degrees(g: &MultiPoly) -> Vec<usize> {
 
 // Verify prover's claim c_1
 // Presented pedantically:
-pub fn verify(g: &MultiPoly, c_1: F251) -> bool {
+pub fn verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Clone{
 	// 1st round
 	let mut p = Prover::new(g);
 	let mut gi = p.gen_uni_polynomial(None);
 	let mut expected_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
 	assert_eq!(c_1, expected_c);
-	let lookup_degree = max_degrees(&g);
+	let lookup_degree = max_degrees(g);
 	assert!(gi.degree() <= lookup_degree[0]);
 
 	// middle rounds
-	for j in 1..p.g.num_vars {
+	for j in 1..p.g.num_vars() {
 		let r = get_r();
 		expected_c = gi.evaluate(&r.unwrap());
 		gi = p.gen_uni_polynomial(r);
@@ -147,7 +167,7 @@ pub fn verify(g: &MultiPoly, c_1: F251) -> bool {
 	true
 }
 
-pub fn slow_verify(g: &MultiPoly, c_1: F251) -> bool {
+pub fn slow_verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Copy{
 	let p = Prover::new(g);
 	let manual_sum = p.slow_sum_g();
 	manual_sum == c_1

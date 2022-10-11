@@ -1,9 +1,9 @@
 use std::{iter, ops::Div};
 
 use ark_ff::{Zero, PrimeField};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm}, Polynomial};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
 
-use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}};
+use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}, sumcheck::SumCheckPolynomial};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -13,6 +13,9 @@ pub struct Matrix {
 #[derive(Debug, Clone)]
 pub struct Triangles {
 	pub matrix: Matrix,
+    f_xy: SparsePolynomial<F251, SparseTerm>,
+    f_yz: SparsePolynomial<F251, SparseTerm>,
+    f_xz: SparsePolynomial<F251, SparseTerm>,
 }
 
 fn println_matrix(matrix: Vec<Vec<F251>>) {
@@ -51,8 +54,40 @@ impl Matrix {
 impl Triangles {
     //todo make Vec<Vec<F251>> type generic
     pub fn new(matrix: Vec<Vec<F251>>) -> Self {
+        let _matrix = Matrix { vec: matrix };
+        let a: Vec<F251> = _matrix.flatten();
+        let var_num = _matrix.var_num();
+    
+        let x_start_index = 0;
+        let y_start_index = var_num;
+        let z_start_index = var_num * 2;
+        
+        // todo optimize these indexes. might use need to use range represent by int
+        let x_indexes = Triangles::gen_var_indexes(x_start_index, var_num);
+        let y_indexes = Triangles::gen_var_indexes(y_start_index, var_num);
+        let mut xy_indexes: Vec<usize> = x_indexes.clone();
+        xy_indexes.append(&mut y_indexes.clone());
+    
+        let mut z_indexes = Triangles::gen_var_indexes(z_start_index, var_num);
+    
+        let mut yz_indexes: Vec<usize> = y_indexes;
+        yz_indexes.append(&mut z_indexes.clone());
+        
+        let mut xz_indexes: Vec<usize> = x_indexes;
+        xz_indexes.append(&mut z_indexes);
+
+        //clean up
+        
+        let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect::<Vec<i128>>();
+        let poly_exist_xy = poly_slow_mle(&converted_a, &xy_indexes);
+        let poly_exist_yz = poly_slow_mle(&converted_a, &yz_indexes);
+        let poly_exist_xz = poly_slow_mle(&converted_a, &xz_indexes);
+
         Triangles {
-            matrix: Matrix { vec: matrix }
+            matrix: _matrix,
+            f_xy: poly_exist_xy,
+            f_yz: poly_exist_yz,
+            f_xz: poly_exist_xz,
         }
     }
 
@@ -167,7 +202,7 @@ impl Triangles {
                     let xyz_bin = Triangles::convert_bin_vec(Triangles::convert_bin_z(x, y, z, var_num));
                     let r: Vec<F251> = xyz_bin.iter().map(|i| F251::from(*i)).collect();
     
-                    let result = poly_exist.evaluate(&r);
+                    let result = ark_poly::Polynomial::evaluate(&poly_exist, &r);
                     let exist = result.into_bigint().as_ref()[0];
     
                     if exist != 0 {
@@ -183,9 +218,53 @@ impl Triangles {
     }
 }
 
-// bench naive calculation
-// bench MLE 
+fn mul(cur: Vec<(F251, SparseTerm)>, other: Vec<(F251, SparseTerm)>) -> Vec<(F251, SparseTerm)> {
+    let mut result_terms = Vec::new();
+    for (cur_coeff, cur_term) in cur.iter() {
+        for (other_coeff, other_term) in other.iter() {
+            let mut term: Vec<(usize, usize)> = cur_term.vars().iter().zip(cur_term.powers()).map(|(v, p)| (*v, p)).collect();
+            term.extend(
+                other_term.vars().iter().zip(other_term.powers()).map(|(v, p)| (*v, p))
+            );
+            let coeff = *cur_coeff * *other_coeff;
+            // //println!("naive mul coeff: {}, cur_coeff: {}, other_coeff: {}", coeff, cur_coeff, other_coeff);
+            result_terms.push((coeff, SparseTerm::new(term)));
+        }
+    }
+    result_terms
+}
 
-// bench sum check
-// prover
-// verifier
+impl SumCheckPolynomial<F251> for Triangles {
+    fn terms(&self) -> Vec<(F251, SparseTerm)> {
+        // [
+        //     self.f_xy.terms.clone(), 
+        //     self.f_yz.terms.clone(), 
+        //     self.f_xz.terms.clone()
+        // ].concat()
+        mul(mul(self.f_xy.terms.clone(), self.f_yz.terms.clone()), self.f_xz.terms.clone())
+    }
+
+    fn num_vars(&self) -> usize {
+        *[
+            self.f_xy.num_vars,
+            self.f_yz.num_vars,
+            self.f_xz.num_vars,
+        ].iter().max().unwrap()
+    }
+
+    fn evaluate(&self, point: &Vec<F251>) -> F251 {
+        // let y_start_index = self.matrix.var_num();
+        // let z_start_index = self.matrix.var_num() * 2;
+        // let point_xy = &point[0..(z_start_index-1)];
+        // let point_yz = &point[y_start_index..(z_start_index + self.matrix.var_num())];
+        // let point_xz = [&point[0..(y_start_index-1)], &point[z_start_index..z_start_index + self.matrix.var_num()]].concat();
+
+        // println!("point {:?}", point);
+        // println!("xy point {:?} {}", point_xy, self.f_xy.num_vars);
+        let xy_evaluation = ark_poly::Polynomial::evaluate(&self.f_xy, point);
+        let yz_evaluation = ark_poly::Polynomial::evaluate(&self.f_yz, point);
+        let xz_evaluation = ark_poly::Polynomial::evaluate(&self.f_xz, point);
+
+        xy_evaluation * yz_evaluation * xz_evaluation
+    }
+}
