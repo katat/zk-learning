@@ -4,7 +4,6 @@ use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
 use ark_std::cfg_into_iter;
-use rand::Rng;
 
 use crate::small_fields::F251;
 
@@ -21,6 +20,7 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
 
 pub trait SumCheckPolynomial<F> {
     fn terms(&self) -> Vec<(F, SparseTerm)>;
+	fn var_fixed_evaluate<C>(&self, cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly;
     fn num_vars(&self) -> usize;
     fn evaluate(&self, point: &Vec<F>) -> F;
 }
@@ -28,6 +28,17 @@ pub trait SumCheckPolynomial<F> {
 impl SumCheckPolynomial<F251> for SparsePolynomial<F251, SparseTerm> {
     fn terms(&self) -> Vec<(F251, SparseTerm)> {
 		self.terms.to_vec()
+    }
+
+    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly {
+        self.terms().clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		)
+
     }
 
     fn num_vars(&self) -> usize {
@@ -70,22 +81,16 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
 	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly {
-		self.g.terms().clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, (coeff, term)| {
-				let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
-				// //println!("term: {:?} fixed_term: {:?} coeff: {:?} coeff_eval: {:?}", term, fixed_term, coeff, coeff_eval);
-				let curr = match fixed_term {
-					None => UniPoly::from_coefficients_vec(vec![(0, coeff * coeff_eval)]),
-					_ => UniPoly::from_coefficients_vec(vec![(
-						fixed_term.unwrap().degree(),
-						coeff * coeff_eval,
-					)]),
-				};
-				// //println!("term: {:?}", curr);
-				curr + sum
-			},
-		)
+		self.g.var_fixed_evaluate(|(coeff, term)| {
+			let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
+			match fixed_term {
+				None => UniPoly::from_coefficients_vec(vec![(0, coeff * coeff_eval)]),
+				_ => UniPoly::from_coefficients_vec(vec![(
+					fixed_term.unwrap().degree(),
+					coeff * coeff_eval,
+				)]),
+			}
+		})
 	}
 
 	// Evaluates a term with a fixed univar, returning (new coefficent, fixed term)

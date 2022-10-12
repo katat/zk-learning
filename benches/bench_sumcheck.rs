@@ -12,7 +12,7 @@ use thaler::sumcheck::{self, SumCheckPolynomial, Prover};
 use thaler::triangles::Triangles;
 
 lazy_static! {
-	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(7);
+	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(8);
 	static ref G_1: Triangles = thaler::triangles::Triangles::new(M_1.clone());
 	static ref P_1: Prover<Triangles> = sumcheck::Prover::new(&G_1);
 	static ref G_1_SUM: F251 = P_1.slow_sum_g();
@@ -41,15 +41,15 @@ fn verifier_steps_only(p: &sumcheck::Prover<Triangles>, gi_lookup: &Vec<sumcheck
 	assert_eq!(*G_1_SUM, expected_c);
 	// println!("g1 terms {}", G_1.terms.len());
 	// OVERHEAD
-	let lookup_degree = sumcheck::max_degrees::<Triangles>(&G_1);
-	assert!(gi.degree() <= lookup_degree[0]);
+	// let lookup_degree = sumcheck::max_degrees::<Triangles>(&G_1);
+	// assert!(gi.degree() <= lookup_degree[0]);
 	// middle rounds
 	for j in 1..p.g.num_vars() {
 		expected_c = gi.evaluate(&r.unwrap());
 		gi = gi_lookup[j].clone();
 		let new_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
 		assert_eq!(expected_c, new_c);
-		assert!(gi.degree() <= lookup_degree[j]);
+		// assert!(gi.degree() <= lookup_degree[j]);
 	}
 	// final round
 	expected_c = gi.evaluate(&r.unwrap());
@@ -59,23 +59,23 @@ fn verifier_steps_only(p: &sumcheck::Prover<Triangles>, gi_lookup: &Vec<sumcheck
 }
 
 // Verifier benchmark
-#[bench]
-fn sumcheck_test(b: &mut Bencher) {
-	println!("g1 num vars {}", G_1.num_vars());
-	let gi_lookup = build_gi_lookup();
-	println!("built lookup");
-	let r: Option<F251> = Some(2u32.into());
-	let p = sumcheck::Prover::<Triangles>::new(&G_1);
+// #[bench]
+// fn sumcheck_test(b: &mut Bencher) {
+// 	println!("g1 num vars {}", G_1.num_vars());
+// 	let gi_lookup = build_gi_lookup();
+// 	println!("built lookup");
+// 	let r: Option<F251> = Some(2u32.into());
+// 	let p = sumcheck::Prover::<Triangles>::new(&G_1);
 	
-	b.iter(|| verifier_steps_only(&p, &gi_lookup, r));
-}
+// 	b.iter(|| verifier_steps_only(&p, &gi_lookup, r));
+// }
 
-#[bench]
-fn prover_lookup_build(b: &mut Bencher) {
-	b.iter(|| {
-		build_gi_lookup();
-	});
-}
+// #[bench]
+// fn prover_lookup_build(b: &mut Bencher) {
+// 	b.iter(|| {
+// 		build_gi_lookup();
+// 	});
+// }
 
 #[bench]
 fn sumcheck_last_round_test(b: &mut Bencher) {
@@ -86,17 +86,15 @@ fn sumcheck_last_round_test(b: &mut Bencher) {
 	});
 }
 
-#[bench]
-fn slow_sumcheck_test(b: &mut Bencher) {
-	let p = sumcheck::Prover::<Triangles>::new(&G_1);
-	b.iter(|| p.slow_sum_g());
-}
+// #[bench]
+// fn slow_sumcheck_test(b: &mut Bencher) {
+// 	let p = sumcheck::Prover::<Triangles>::new(&G_1);
+// 	b.iter(|| p.slow_sum_g());
+// }
 
 #[bench]
 fn naive_count(b: &mut Bencher) {
-    let triangles = thaler::triangles::Triangles::new(M_1.clone());
-	
 	b.iter(|| {
-		triangles.count();
+		G_1.count();
 	});
 }

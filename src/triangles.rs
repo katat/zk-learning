@@ -3,7 +3,7 @@ use std::{iter, ops::Div};
 use ark_ff::{Zero, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
 
-use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}, sumcheck::SumCheckPolynomial};
+use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -261,10 +261,38 @@ impl SumCheckPolynomial<F251> for Triangles {
 
         // println!("point {:?}", point);
         // println!("xy point {:?} {}", point_xy, self.f_xy.num_vars);
+        // println!("f xy terms {}", self.f_xy.terms.len());
+        // println!("point len {}", point.len());
         let xy_evaluation = ark_poly::Polynomial::evaluate(&self.f_xy, point);
         let yz_evaluation = ark_poly::Polynomial::evaluate(&self.f_yz, point);
         let xz_evaluation = ark_poly::Polynomial::evaluate(&self.f_xz, point);
 
         xy_evaluation * yz_evaluation * xz_evaluation
+        // xy_evaluation
+    }
+
+    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly {
+        let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		);
+        let f_yz_unipoly: UniPoly = self.f_yz.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		);
+        let f_xz_unipoly: UniPoly = self.f_xz.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		);
+        f_xy_unipoly.mul(&f_yz_unipoly).mul(&f_xz_unipoly)
     }
 }
