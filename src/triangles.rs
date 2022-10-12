@@ -3,7 +3,7 @@ use std::{iter, ops::Div};
 use ark_ff::{Zero, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
 
-use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle, eval_dynamic_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -267,9 +267,12 @@ impl SumCheckPolynomial<F251> for Triangles {
         // let yz_evaluation = ark_poly::Polynomial::evaluate(&self.f_yz, point);
         // let xz_evaluation = ark_poly::Polynomial::evaluate(&self.f_xz, point);
 
-        let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
-        let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
-        let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
+        // let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
+        // let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
+        // let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
+        let xy_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
+        let yz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
+        let xz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xz.to_vec());
         // println!("evaluation {}  eval {} ", xz_evaluation, xz_eval);
 
         xy_eval * yz_eval * xz_eval

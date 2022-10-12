@@ -12,7 +12,7 @@ use thaler::sumcheck::{self, SumCheckPolynomial, Prover};
 use thaler::triangles::Triangles;
 
 lazy_static! {
-	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(33);
+	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(64);
 	static ref G_1: Triangles = thaler::triangles::Triangles::new(M_1.clone());
 	static ref P_1: Prover<Triangles> = sumcheck::Prover::new(&G_1);
 	static ref G_1_SUM: F251 = P_1.slow_sum_g();
@@ -59,16 +59,16 @@ fn verifier_steps_only(p: &sumcheck::Prover<Triangles>, gi_lookup: &Vec<sumcheck
 }
 
 // Verifier benchmark
-// #[bench]
-// fn sumcheck_test(b: &mut Bencher) {
-// 	println!("g1 num vars {}", G_1.num_vars());
-// 	let gi_lookup = build_gi_lookup();
-// 	println!("built lookup");
-// 	let r: Option<F251> = Some(2u32.into());
-// 	let p = sumcheck::Prover::<Triangles>::new(&G_1);
+#[bench]
+fn sumcheck_test(b: &mut Bencher) {
+	println!("g1 num vars {}", G_1.num_vars());
+	let gi_lookup = build_gi_lookup();
+	println!("built lookup");
+	let r: Option<F251> = Some(2u32.into());
+	let p = sumcheck::Prover::<Triangles>::new(&G_1);
 	
-// 	b.iter(|| verifier_steps_only(&p, &gi_lookup, r));
-// }
+	b.iter(|| verifier_steps_only(&p, &gi_lookup, r));
+}
 
 // #[bench]
 // fn prover_lookup_build(b: &mut Bencher) {

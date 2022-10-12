@@ -136,6 +136,31 @@ pub fn eval_slow_mle(fw: &[F251], point: &Vec<F251>) -> F251 {
 	sum
 }
 
+pub fn eval_memoize(r: &Vec<F251>, v: usize) -> Vec<F251> {
+	match v {
+		1 => {
+			vec![eval_chi_step(false, r[v - 1]), eval_chi_step(true, r[v - 1])]
+		}
+		_ => eval_memoize(r, v - 1)
+			.iter()
+			.flat_map(|val| {
+				[
+					*val * eval_chi_step(false, r[v - 1]),
+					*val * eval_chi_step(true, r[v - 1]),
+				]
+			})
+			.collect(),
+	}
+}
+
+pub fn eval_dynamic_mle(fw: &Vec<F251>, r: &Vec<F251>) -> F251 {
+	let chi_lookup = eval_memoize(r, r.len());
+	fw.iter()
+		.zip(chi_lookup.iter())
+		.map(|(left, right)| *left * *right)
+		.sum()
+}
+
 // Lemma 3.7
 // pub fn stream_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
 // 	recurse(fw, r, 2usize.pow(r.len() as u32)) % p
