@@ -1,10 +1,10 @@
-use ark_ff::{Zero, PrimeField};
+use ark_ff::{Zero, One, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial, DenseMVPolynomial};
 use crate::small_fields::F251;
 
 
 // One step in chi
-pub fn chi_step(w: bool, v: usize) -> SparsePolynomial<F251, SparseTerm> {
+pub fn poly_chi_step(w: bool, v: usize) -> SparsePolynomial<F251, SparseTerm> {
 	// x * i128::from(w) + (1 - x) * (1 - i128::from(w));
 	// //println!("step v+1:{}", v+1);
 
@@ -70,7 +70,7 @@ pub fn naive_mul(
 }
 
 // Computes Chi_w(r) for all w, O(log n) operations
-pub fn chi_w(w: &[bool], vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
+pub fn poly_chi_w(w: &[bool], vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm> {
 	// //println!("chi w...");
 	let product: SparsePolynomial<F251, SparseTerm> = w
 		.iter()
@@ -79,18 +79,12 @@ pub fn chi_w(w: &[bool], vars: &Vec<usize>) -> SparsePolynomial<F251, SparseTerm
 		.fold(
 			SparsePolynomial::from_coefficients_slice(0, &[(F251::from(1), SparseTerm::new(Vec::new()))]), 
 			|p, ((_, w), v)| {
-				let step = chi_step(*w, *v);
+				let step = poly_chi_step(*w, *v);
 				naive_mul(&p, &step)
 			}
 		);
 
 	product
-
-	// let r: Vec<F251> = r.iter().map(|i| F251::from(*i)).collect();
-
-	// lets = &product.evaluate(&r);
-	// let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
-	// result
 }
 
 // Calculating the slow way, for benchmarking
@@ -103,26 +97,43 @@ pub fn poly_slow_mle(fw: &[i128], vars: &Vec<usize>) -> SparsePolynomial<F251, S
 			|sum, (i, val)| {
 				let factor = SparsePolynomial::from_coefficients_slice(0, &[(F251::from(*val), SparseTerm::new(Vec::new()))]);
 				// [x1, x2, y1, y2]
-				sum + naive_mul(&factor, &chi_w(&n_to_vec(i, vars.len()), vars))
+				sum + naive_mul(&factor, &poly_chi_w(&n_to_vec(i, vars.len()), vars))
 			}
 		);
 
 	sum
 }
 
-pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, vars: &Vec<usize>) -> F251 {
-	let fw_len = (fw.len() as f64).sqrt();
-	assert_eq!(r.len() as f64, fw_len);
-	let sum: SparsePolynomial<F251, SparseTerm> = poly_slow_mle(fw, vars);
-	
-	let mut r: Vec<F251> = r.iter().map(|i| F251::from(*i)).collect();
+pub fn eval_chi_step(w: bool, x: F251) -> F251 {
+	x * F251::from(w) + (F251::one() - x) * (F251::one() - F251::from(w))
+}
 
-	let diff = sum.num_vars() - r.len();
-	r.splice::<_, _>(0..0, std::iter::repeat(F251::from(0i32)).take(diff));
-	let s: F251 = sum.evaluate(&r);
-	s
-	// let result = i128::from_str_radix(&s.into_repr().to_string(), 16).unwrap();
-	// result 
+pub fn eval_chi_w(w: &[bool], point: &Vec<F251>) -> F251 {
+	w.iter()
+	.enumerate()
+	.zip(point)
+	.fold(
+		F251::from(1),
+		|prev, ((_, w), v)| {
+			let step = eval_chi_step(*w, *v);
+			prev * step
+		}
+	)
+}
+
+pub fn eval_slow_mle(fw: &[F251], point: &Vec<F251>) -> F251 {
+	let sum: F251 = fw
+		.iter()
+		.enumerate()
+		.fold(
+			F251::from(0),
+			|sum, (i, val)| {
+				let factor = *val;
+				sum + factor * eval_chi_w(&n_to_vec(i, point.len()), point)
+			}
+		);
+
+	sum
 }
 
 // Lemma 3.7
@@ -261,4 +272,71 @@ pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
 	// todo get polynomial multiplied before evaluation
 	total_triangles as u32 / 6
 
+}
+
+// One step in chi
+pub fn chi_step(w: bool, x: i128) -> i128 {
+	x * i128::from(w) + (1 - x) * (1 - i128::from(w))
+}
+
+// Computes Chi_w(r) for all w, O(log n) operations
+pub fn chi_w(w: &Vec<bool>, r: &Vec<i128>) -> i128 {
+	assert_eq!(w.len(), r.len());
+	let product: i128 = w
+		.iter()
+		.zip(r.iter())
+		.map(|(&w, &r)| chi_step(w, r))
+		.product();
+	product
+}
+
+// Calculating the slow way, for benchmarking
+pub fn slow_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
+	assert_eq!(r.len() as f64, (fw.len() as f64).sqrt());
+	let sum: i128 = fw
+		.iter()
+		.enumerate()
+		.map(|(i, val)| val * chi_w(&n_to_vec(i, r.len()), r))
+		.sum();
+	sum % p
+}
+
+// Lemma 3.7
+pub fn stream_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
+	recurse(fw, r, 2usize.pow(r.len() as u32)) % p
+}
+
+pub fn recurse(fw: &Vec<i128>, r: &Vec<i128>, n: usize) -> i128 {
+	match n {
+		0 => 0,
+		_ => recurse(fw, r, n - 1) + fw[n - 1] * chi_w(&n_to_vec(n - 1, r.len()), r),
+	}
+}
+
+// Lemm 3.8
+pub fn dynamic_mle(fw: &Vec<i128>, r: &Vec<i128>, p: i128) -> i128 {
+	let chi_lookup = memoize(r, r.len());
+	let result: i128 = fw
+		.iter()
+		.zip(chi_lookup.iter())
+		.map(|(left, right)| left * right)
+		.sum();
+	result % p
+}
+
+pub fn memoize(r: &Vec<i128>, v: usize) -> Vec<i128> {
+	match v {
+		1 => {
+			vec![chi_step(false, r[v - 1]), chi_step(true, r[v - 1])]
+		}
+		_ => memoize(r, v - 1)
+			.iter()
+			.flat_map(|val| {
+				[
+					val * chi_step(false, r[v - 1]),
+					val * chi_step(true, r[v - 1]),
+				]
+			})
+			.collect(),
+	}
 }

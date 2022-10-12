@@ -3,7 +3,7 @@ use std::{iter, ops::Div};
 use ark_ff::{Zero, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
 
-use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -253,21 +253,27 @@ impl SumCheckPolynomial<F251> for Triangles {
     }
 
     fn evaluate(&self, point: &Vec<F251>) -> F251 {
-        // let y_start_index = self.matrix.var_num();
-        // let z_start_index = self.matrix.var_num() * 2;
-        // let point_xy = &point[0..(z_start_index-1)];
-        // let point_yz = &point[y_start_index..(z_start_index + self.matrix.var_num())];
-        // let point_xz = [&point[0..(y_start_index-1)], &point[z_start_index..z_start_index + self.matrix.var_num()]].concat();
+        let y_start_index = self.matrix.var_num();
+        let z_start_index = self.matrix.var_num() * 2;
+        let point_xy = &point[0..(z_start_index)];
+        let point_yz = &point[y_start_index..(z_start_index + self.matrix.var_num())];
+        let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
 
         // println!("point {:?}", point);
         // println!("xy point {:?} {}", point_xy, self.f_xy.num_vars);
         // println!("f xy terms {}", self.f_xy.terms.len());
         // println!("point len {}", point.len());
-        let xy_evaluation = ark_poly::Polynomial::evaluate(&self.f_xy, point);
-        let yz_evaluation = ark_poly::Polynomial::evaluate(&self.f_yz, point);
-        let xz_evaluation = ark_poly::Polynomial::evaluate(&self.f_xz, point);
+        // let xy_evaluation = ark_poly::Polynomial::evaluate(&self.f_xy, point);
+        // let yz_evaluation = ark_poly::Polynomial::evaluate(&self.f_yz, point);
+        // let xz_evaluation = ark_poly::Polynomial::evaluate(&self.f_xz, point);
 
-        xy_evaluation * yz_evaluation * xz_evaluation
+        let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
+        let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
+        let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
+        // println!("evaluation {}  eval {} ", xz_evaluation, xz_eval);
+
+        xy_eval * yz_eval * xz_eval
+        // xy_evaluation * yz_evaluation * xz_evaluation
         // xy_evaluation
     }
 

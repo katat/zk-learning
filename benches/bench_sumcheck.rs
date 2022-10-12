@@ -12,7 +12,7 @@ use thaler::sumcheck::{self, SumCheckPolynomial, Prover};
 use thaler::triangles::Triangles;
 
 lazy_static! {
-	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(8);
+	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(33);
 	static ref G_1: Triangles = thaler::triangles::Triangles::new(M_1.clone());
 	static ref P_1: Prover<Triangles> = sumcheck::Prover::new(&G_1);
 	static ref G_1_SUM: F251 = P_1.slow_sum_g();
