@@ -8,7 +8,7 @@ use ark_ff::{Zero, One};
 use ark_poly::polynomial::{Polynomial};
 use test::Bencher;
 use thaler::small_fields::{F251};
-use thaler::sumcheck::{self, SumCheckPolynomial, Prover};
+use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
 use thaler::triangles::Triangles;
 
 lazy_static! {
@@ -35,27 +35,14 @@ fn build_gi_lookup() -> Vec<sumcheck::UniPoly> {
 
 // Steps being benchmarked
 fn verifier_steps_only(p: &sumcheck::Prover<Triangles>, gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<F251>) {
-	// initial round
-	let mut gi = gi_lookup[0].clone();
-	let mut expected_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
-	assert_eq!(*G_1_SUM, expected_c);
-	// println!("g1 terms {}", G_1.terms.len());
-	// OVERHEAD
-	// let lookup_degree = sumcheck::max_degrees::<Triangles>(&G_1);
-	// assert!(gi.degree() <= lookup_degree[0]);
-	// middle rounds
-	for j in 1..p.g.num_vars() {
-		expected_c = gi.evaluate(&r.unwrap());
-		gi = gi_lookup[j].clone();
-		let new_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
-		assert_eq!(expected_c, new_c);
-		// assert!(gi.degree() <= lookup_degree[j]);
+	let mut v: Verifier<UniPoly, Triangles> = Verifier::new(*G_1_SUM, G_1.clone());
+	while v.current_round != Some(sumcheck::Round::Final()) {
+		let gi = gi_lookup[v.r_vec.len()].clone();
+		v.verify(Some(gi));
 	}
+
 	// final round
-	expected_c = gi.evaluate(&r.unwrap());
-	// OVERHEAD
-	let new_c = G_1.evaluate(&vec![r.unwrap(); p.g.num_vars()]);
-	assert_eq!(expected_c, new_c);
+	v.verify(None);
 }
 
 // Verifier benchmark

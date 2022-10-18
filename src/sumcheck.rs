@@ -1,14 +1,21 @@
-use ark_ff::Field;
+use ark_ff::{Field, Zero};
 use ark_ff::{One};
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
 use ark_std::cfg_into_iter;
+use rand::Rng;
 
 use crate::small_fields::F251;
 
 pub type MultiPoly = SparsePolynomial<F251, SparseTerm>;
 pub type UniPoly = UniSparsePolynomial<F251>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Round {
+	Middle(usize),
+	Final(),
+}
 
 // Converts i into an index in {0,1}^v
 pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
@@ -55,6 +62,80 @@ impl SumCheckPolynomial<F251> for SparsePolynomial<F251, SparseTerm> {
 pub struct Prover<P: SumCheckPolynomial<F251>> {
 	pub g: P,
 	pub r_vec: Vec<F251>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Verifier<P: Polynomial<F251>, G: SumCheckPolynomial<F251>> {
+	pub c_1: F251,
+	pub g: G,
+	pub rounds: usize,
+	pub prev_g_i: Option<P>,
+	pub r_vec: Vec<F251>,
+	pub current_round: Option<Round>,
+}
+
+impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P, G>  {
+	pub fn new(c_1: F251, g: G) -> Self {
+		let rounds = g.num_vars();
+		Verifier {
+			c_1,
+			g,
+			rounds,
+			prev_g_i: None,
+			r_vec: vec![],
+			current_round: None,
+		}
+	}
+
+	fn generate_random(&mut self) -> F251 {
+		// todo see if criterion benching can avoid changing these randoms
+		// let mut rng = rand::thread_rng();
+		// let r: F251 = rng.gen();
+		let r: F251 = F251::from(2);
+		self.r_vec.push(r);
+		r
+	}
+
+	fn advance(&mut self) -> Round {
+		self.generate_random();
+		let cur_round = self.r_vec.len();
+
+		if cur_round < self.rounds {
+			Round::Middle(cur_round)
+		}
+		else {
+			Round::Final()
+		}
+	}
+
+	pub fn verify(&mut self, g_i: Option<P>) {
+
+		match &self.current_round {
+			None => {
+				let g_i = g_i.unwrap();
+				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
+				assert_eq!(self.c_1, new_c);
+				self.prev_g_i = Some(g_i);
+			},
+			Some(Round::Middle(_)) => {
+				let g_i = g_i.unwrap();
+				let last_r = self.r_vec.last().unwrap();
+				let expected_c = self.prev_g_i.as_ref().unwrap().evaluate(last_r);
+				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
+				assert_eq!(expected_c, new_c);
+				self.prev_g_i = Some(g_i);
+			},
+			Some(Round::Final()) => {
+				let last_r = self.r_vec.last().unwrap();
+				let expected_c = self.prev_g_i.as_ref().unwrap().evaluate(last_r);
+				let new_c = self.g.evaluate(&self.r_vec);
+				assert_eq!(expected_c, new_c);
+				return
+			}
+		};
+
+		self.current_round = Some(self.advance());
+	}
 }
 
 impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
@@ -143,32 +224,21 @@ pub fn max_degrees<P: SumCheckPolynomial<F251>>(g: &P) -> Vec<usize> {
 	lookup
 }
 
-// Verify prover's claim c_1
-// Presented pedantically:
 pub fn verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Clone{
-	// 1st round
 	let mut p = Prover::new(g);
-	let mut gi = p.gen_uni_polynomial(None);
-	let mut expected_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
-	assert_eq!(c_1, expected_c);
-	let lookup_degree = max_degrees(g);
-	assert!(gi.degree() <= lookup_degree[0]);
 
-	// middle rounds
-	for j in 1..p.g.num_vars() {
-		let r = get_r();
-		expected_c = gi.evaluate(&r.unwrap());
-		gi = p.gen_uni_polynomial(r);
-		let new_c = gi.evaluate(&0u32.into()) + gi.evaluate(&1u32.into());
-		assert_eq!(expected_c, new_c);
-		assert!(gi.degree() <= lookup_degree[j]);
+	let mut v: Verifier<UniPoly, P> = Verifier::new(c_1, g.clone());
+	while v.current_round != Some(Round::Final()) {
+		let r = v.r_vec.last();
+		let gi = match r {
+			None => p.gen_uni_polynomial(None),
+			_default => p.gen_uni_polynomial(Some(*r.unwrap()))
+		};
+		v.verify(Some(gi));
 	}
+
 	// final round
-	let r = get_r();
-	expected_c = gi.evaluate(&r.unwrap());
-	p.r_vec.push(r.unwrap());
-	let new_c = p.g.evaluate(&p.r_vec);
-	assert_eq!(expected_c, new_c);
+	v.verify(None);
 	true
 }
 
