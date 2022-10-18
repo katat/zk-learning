@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate lazy_static;
+use ark_ff::{Zero, One, PrimeField};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial, DenseMVPolynomial};
 
 use rstest::rstest;
-use thaler::lagrange::{self, convert_bin, count_triangles};
+use thaler::lagrange::{self, convert_bin, count_triangles, eval_chi_step, eval_poly_chi_step};
+use thaler::small_fields::F251;
 
 lazy_static! {
 	static ref F_2: Vec<i128> = Vec::from([1, 2, 1, 4]);
@@ -56,6 +59,18 @@ fn count_triangles_test(
 	#[case] expected: u32
 ) {
 	assert_eq!(count_triangles(fw), expected);
+
+	let e = eval_poly_chi_step(
+		true, 
+		&SparsePolynomial::from_coefficients_vec(
+			1, 
+			vec![(F251::one(), SparseTerm::new(vec![(0, 1)]))]
+		)
+	);
+	assert_eq!(
+		eval_chi_step(true, thaler::small_fields::F251::from(3)),
+		e.evaluate(&vec![F251::from(3)])
+	);
 }
 
 #[rstest]

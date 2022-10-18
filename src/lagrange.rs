@@ -1,6 +1,6 @@
 use ark_ff::{Zero, One, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial, DenseMVPolynomial};
-use crate::small_fields::F251;
+use crate::{small_fields::F251, sumcheck::UniPoly};
 
 
 // One step in chi
@@ -136,29 +136,58 @@ pub fn eval_slow_mle(fw: &[F251], point: &Vec<F251>) -> F251 {
 	sum
 }
 
-pub fn eval_memoize(r: &Vec<F251>, v: usize) -> Vec<F251> {
+pub fn poly_constant(c: F251) -> SparsePolynomial<F251, SparseTerm> {
+	SparsePolynomial::from_coefficients_vec(
+		0, 
+		vec![(c, SparseTerm::new(vec![]))]
+	)
+}
+
+pub fn eval_poly_chi_step(w: bool, x: &SparsePolynomial<F251, SparseTerm>) -> SparsePolynomial<F251, SparseTerm> {
+	let one_minus_w = (1 - (w as i128)).into();
+	let w_minus_one = w as i128 - 1;
+
+	naive_mul(
+		&poly_constant(F251::from(w as i128)),
+		x
+	) +
+	poly_constant(one_minus_w) +
+	naive_mul(
+		&poly_constant(w_minus_one.into()),
+		x
+	)
+}
+
+pub fn eval_memoize(r: &Vec<SparsePolynomial<F251, SparseTerm>>, v: usize) -> Vec<SparsePolynomial<F251, SparseTerm>> {
 	match v {
 		1 => {
-			vec![eval_chi_step(false, r[v - 1]), eval_chi_step(true, r[v - 1])]
+			vec![eval_poly_chi_step(false, &r[v - 1]), eval_poly_chi_step(true, &r[v - 1])]
 		}
 		_ => eval_memoize(r, v - 1)
 			.iter()
 			.flat_map(|val| {
 				[
-					*val * eval_chi_step(false, r[v - 1]),
-					*val * eval_chi_step(true, r[v - 1]),
+					naive_mul(val, &eval_poly_chi_step(false, &r[v - 1])),
+					naive_mul(val, &eval_poly_chi_step(true, &r[v - 1])),
 				]
 			})
 			.collect(),
 	}
 }
 
-pub fn eval_dynamic_mle(fw: &Vec<F251>, r: &Vec<F251>) -> F251 {
+pub fn eval_dynamic_mle(fw: &[F251], r: &Vec<SparsePolynomial<F251, SparseTerm>>) -> SparsePolynomial<F251, SparseTerm> {
 	let chi_lookup = eval_memoize(r, r.len());
 	fw.iter()
 		.zip(chi_lookup.iter())
-		.map(|(left, right)| *left * *right)
-		.sum()
+		.fold(SparsePolynomial::zero(), |sum, (left, right)| {
+			sum +
+			naive_mul(
+				&SparsePolynomial::from_coefficients_vec(0, vec![
+					(*left, SparseTerm::new(vec![]))
+				]), 
+				right
+			)
+		})
 }
 
 // Lemma 3.7
@@ -286,9 +315,9 @@ pub fn count_triangles(matrix: &Vec<i128>) -> u32 {
 				
 				let exist = result.into_bigint().as_ref()[0];
 
-				if exist != 0 {
-					println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
-				}
+				// if exist != 0 {
+				// 	println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
+				// }
 				total_triangles += exist;
 			}
 		}

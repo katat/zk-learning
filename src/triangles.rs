@@ -3,7 +3,7 @@ use std::{iter, ops::Div};
 use ark_ff::{Zero, PrimeField};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
 
-use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle, eval_dynamic_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle, eval_dynamic_mle, poly_constant}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct Matrix {
@@ -270,17 +270,22 @@ impl SumCheckPolynomial<F251> for Triangles {
         // let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
         // let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
         // let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
-        let xy_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
-        let yz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
-        let xz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xz.to_vec());
-        // println!("evaluation {}  eval {} ", xz_evaluation, xz_eval);
+        let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
+        let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
+        let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
+        let xy_eval = eval_dynamic_mle(&self.matrix.flatten(), &xyp);
+        let yz_eval = eval_dynamic_mle(&self.matrix.flatten(), &yzp);
+        let xz_eval = eval_dynamic_mle(&self.matrix.flatten(), &xzp);
 
-        xy_eval * yz_eval * xz_eval
+        ark_poly::Polynomial::evaluate(&xy_eval, &vec![]) * 
+        ark_poly::Polynomial::evaluate(&yz_eval, &vec![]) * 
+        ark_poly::Polynomial::evaluate(&xz_eval, &vec![]) 
         // xy_evaluation * yz_evaluation * xz_evaluation
         // xy_evaluation
     }
 
     fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly {
+
         let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, term| {
