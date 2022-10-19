@@ -72,6 +72,8 @@ pub struct Verifier<P: Polynomial<F251>, G: SumCheckPolynomial<F251>> {
 	pub prev_g_i: Option<P>,
 	pub r_vec: Vec<F251>,
 	pub current_round: Option<Round>,
+	//todo this is not closure, find a better way to achieve closure.
+	pub random_func: Option<fn() -> F251>
 }
 
 impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P, G>  {
@@ -84,14 +86,23 @@ impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P
 			prev_g_i: None,
 			r_vec: vec![],
 			current_round: None,
+			random_func: None,
 		}
+	}
+
+	pub fn random_func(&mut self, f: fn() -> F251) {
+		self.random_func = Some(f);
 	}
 
 	fn generate_random(&mut self) -> F251 {
 		// todo see if criterion benching can avoid changing these randoms
-		// let mut rng = rand::thread_rng();
-		// let r: F251 = rng.gen();
-		let r: F251 = F251::from(2);
+		let mut rng = rand::thread_rng();
+		let mut r = rng.gen();
+
+		if self.random_func != None {
+			r = self.random_func.unwrap()();
+		}
+
 		self.r_vec.push(r);
 		r
 	}
@@ -201,14 +212,6 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 			.map(|n| self.g.evaluate(&n_to_vec(n as usize, v)))
 			.sum()
 	}
-}
-
-// Verifier procedures
-pub fn get_r() -> Option<F251> {
-	// let mut rng = rand::thread_rng();
-	// let r: F251 = rng.gen();
-	let r: F251 = F251::one();
-	Some(r)
 }
 
 // A degree look up table for all variables in g
