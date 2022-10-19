@@ -60,10 +60,9 @@ fn bench_verifier(c: &mut Criterion) {
 		let mut v: Verifier<UniPoly, Triangles> = Verifier::new(g_sum, Rc::new(g.clone()));
 		v.random_func(|| F251::from(1));
 		
-		group.bench_with_input(
+		group.bench_function(
 			BenchmarkId::new::<&str, usize>("verifier with vars", lookup.len()), 
-			&v, 
-			|b, v| {
+			|b| {
 				b.iter(|| {
 					let mut v = v.clone();
 					(0..lookup.len()).for_each(|i| {
@@ -74,23 +73,8 @@ fn bench_verifier(c: &mut Criterion) {
 				});
 			}
 		);
-		// group.bench_function(
-		// 	BenchmarkId::new::<&str, usize>("verifier with vars", lookup.len()),
-		// 	|b| {
-		// 		b.iter(|| {
-		// 			// v.r_vec = vec![];
-					
-		// 			for i in 0..lookup.len() {
-		// 				let g_i = &lookup[i];
-		// 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
-		// 			}
-		// 			g.evaluate(&vec![F251::from(1); lookup.len()])
-		// 			// v.verify(None);
-		// 		});
-		// 	}
-		// );
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>("count triangles with size", size), 
+			BenchmarkId::new::<&str, usize>("count triangles with size", lookup.len()), 
 			|b| {
 				b.iter(|| {
 					g.count()
@@ -101,17 +85,6 @@ fn bench_verifier(c: &mut Criterion) {
 
 
 	group.finish();
-
-	// Prover::init
-
-	// random = SumCheck::Verifier.generate_random()
-	// gj = SumCheck::Prover.generate_unipoly(random)
-	// enum round = SumCheck::Verifier.verify(gj)
-	
-	// make it easy to plug in implementations for the following as they are source of overheads
-		// SumCheck::Prover.generate_unipoly
-		// last round of verifier evaluation
-			// make it easy to bench different mle algos
 }
 
 // #[bench]
