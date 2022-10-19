@@ -270,16 +270,18 @@ impl SumCheckPolynomial<F251> for Triangles {
         // let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
         // let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
         // let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
-        let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
-        let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
-        let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
-        let xy_eval = eval_dynamic_mle(&self.matrix.flatten(), &xyp);
-        let yz_eval = eval_dynamic_mle(&self.matrix.flatten(), &yzp);
-        let xz_eval = eval_dynamic_mle(&self.matrix.flatten(), &xzp);
+        // let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
+        // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
+        // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
+        let xy_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
+        let yz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
+        let xz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xz);
 
-        ark_poly::Polynomial::evaluate(&xy_eval, &vec![]) * 
-        ark_poly::Polynomial::evaluate(&yz_eval, &vec![]) * 
-        ark_poly::Polynomial::evaluate(&xz_eval, &vec![]) 
+        xy_eval * yz_eval * xz_eval
+        // ark_poly::Polynomial::evaluate(&xy_eval, &vec![]) * 
+        // ark_poly::Polynomial::evaluate(&yz_eval, &vec![]) * 
+        // ark_poly::Polynomial::evaluate(&xz_eval, &vec![]) 
+
         // xy_evaluation * yz_evaluation * xz_evaluation
         // xy_evaluation
     }

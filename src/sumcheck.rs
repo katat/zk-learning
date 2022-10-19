@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ark_ff::{Field, Zero};
 use ark_ff::{One};
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
@@ -67,7 +69,7 @@ pub struct Prover<P: SumCheckPolynomial<F251>> {
 #[derive(Debug, Clone)]
 pub struct Verifier<P: Polynomial<F251>, G: SumCheckPolynomial<F251>> {
 	pub c_1: F251,
-	pub g: G,
+	pub g: Rc<G>,
 	pub rounds: usize,
 	pub prev_g_i: Option<P>,
 	pub r_vec: Vec<F251>,
@@ -77,7 +79,7 @@ pub struct Verifier<P: Polynomial<F251>, G: SumCheckPolynomial<F251>> {
 }
 
 impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P, G>  {
-	pub fn new(c_1: F251, g: G) -> Self {
+	pub fn new(c_1: F251, g: Rc<G>) -> Self {
 		let rounds = g.num_vars();
 		Verifier {
 			c_1,
@@ -230,7 +232,7 @@ pub fn max_degrees<P: SumCheckPolynomial<F251>>(g: &P) -> Vec<usize> {
 pub fn verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Clone{
 	let mut p = Prover::new(g);
 
-	let mut v: Verifier<UniPoly, P> = Verifier::new(c_1, g.clone());
+	let mut v: Verifier<UniPoly, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
 	while v.current_round != Some(Round::Final()) {
 		let r = v.r_vec.last();
 		let gi = match r {

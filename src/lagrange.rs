@@ -158,36 +158,29 @@ pub fn eval_poly_chi_step(w: bool, x: &SparsePolynomial<F251, SparseTerm>) -> Sp
 	)
 }
 
-pub fn eval_memoize(r: &Vec<SparsePolynomial<F251, SparseTerm>>, v: usize) -> Vec<SparsePolynomial<F251, SparseTerm>> {
+pub fn eval_memoize(r: &Vec<F251>, v: usize) -> Vec<F251> {
 	match v {
 		1 => {
-			vec![eval_poly_chi_step(false, &r[v - 1]), eval_poly_chi_step(true, &r[v - 1])]
+			vec![eval_chi_step(false, r[v - 1]), eval_chi_step(true, r[v - 1])]
 		}
 		_ => eval_memoize(r, v - 1)
 			.iter()
 			.flat_map(|val| {
 				[
-					naive_mul(val, &eval_poly_chi_step(false, &r[v - 1])),
-					naive_mul(val, &eval_poly_chi_step(true, &r[v - 1])),
+					*val * eval_chi_step(false, r[v - 1]),
+					*val * eval_chi_step(true, r[v - 1]),
 				]
 			})
 			.collect(),
 	}
 }
 
-pub fn eval_dynamic_mle(fw: &[F251], r: &Vec<SparsePolynomial<F251, SparseTerm>>) -> SparsePolynomial<F251, SparseTerm> {
+pub fn eval_dynamic_mle(fw: &Vec<F251>, r: &Vec<F251>) -> F251 {
 	let chi_lookup = eval_memoize(r, r.len());
 	fw.iter()
 		.zip(chi_lookup.iter())
-		.fold(SparsePolynomial::zero(), |sum, (left, right)| {
-			sum +
-			naive_mul(
-				&SparsePolynomial::from_coefficients_vec(0, vec![
-					(*left, SparseTerm::new(vec![]))
-				]), 
-				right
-			)
-		})
+		.map(|(left, right)| *left * *right)
+		.sum()
 }
 
 // Lemma 3.7

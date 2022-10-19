@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate lazy_static;
 
+use std::rc::Rc;
+
 use ark_ff::{Zero, One};
 use ark_poly::polynomial::{Polynomial};
 use thaler::small_fields::{F251};
@@ -47,7 +49,7 @@ fn build_gi_lookup(g: &Triangles) -> Vec<sumcheck::UniPoly> {
 fn bench_verifier(c: &mut Criterion) {
 	let mut group = c.benchmark_group("verifier");
 
-	let matrix_sizes = [4, 8, 16];
+	let matrix_sizes = [4, 8, 16, 32, 64];
 	for size in matrix_sizes {
 		let matrix: Vec<Vec<F251>> = thaler::utils::gen_matrix(size);
 		let g: Triangles = thaler::triangles::Triangles::new(matrix.clone());
@@ -55,7 +57,7 @@ fn bench_verifier(c: &mut Criterion) {
 		let g_sum = p.slow_sum_g();
 		let lookup = build_gi_lookup(&g);
 	
-		let mut v: Verifier<UniPoly, Triangles> = Verifier::new(g_sum, g.clone());
+		let mut v: Verifier<UniPoly, Triangles> = Verifier::new(g_sum, Rc::new(g.clone()));
 		v.random_func(|| F251::from(1));
 		
 		group.bench_with_input(
@@ -72,10 +74,27 @@ fn bench_verifier(c: &mut Criterion) {
 				});
 			}
 		);
+		// group.bench_function(
+		// 	BenchmarkId::new::<&str, usize>("verifier with vars", lookup.len()),
+		// 	|b| {
+		// 		b.iter(|| {
+		// 			// v.r_vec = vec![];
+					
+		// 			for i in 0..lookup.len() {
+		// 				let g_i = &lookup[i];
+		// 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
+		// 			}
+		// 			g.evaluate(&vec![F251::from(1); lookup.len()])
+		// 			// v.verify(None);
+		// 		});
+		// 	}
+		// );
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("count triangles with size", size), 
 			|b| {
-				b.iter(|| g.count());
+				b.iter(|| {
+					g.count()
+				});
 			}
 		);
 	}
