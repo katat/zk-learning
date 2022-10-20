@@ -1,27 +1,14 @@
-#[macro_use]
-extern crate lazy_static;
-
 use std::rc::Rc;
-
-use ark_ff::{Zero, One};
-use ark_poly::polynomial::{Polynomial};
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
 use thaler::triangles::Triangles;
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
-// lazy_static! {
-// 	static ref M_1: Vec<Vec<F251>> = thaler::utils::gen_matrix(16);
-// 	static ref G_1: Triangles = thaler::triangles::Triangles::new(M_1.clone());
-// 	static ref P_1: Prover<Triangles> = sumcheck::Prover::new(&G_1);
-// 	static ref G_1_SUM: F251 = P_1.slow_sum_g();
-// }
-
 // a gi lookup table
-fn build_gi_lookup(g: &Triangles) -> Vec<sumcheck::UniPoly> {
+fn build_gi_lookup(g: &Triangles<F251>) -> Vec<sumcheck::UniPoly> {
 	let r: Option<F251> = Some(1u32.into());
 	let mut lookup= vec![];
-	let mut p: Prover<Triangles> = sumcheck::Prover::<Triangles>::new(g);
+	let mut p: Prover<Triangles<F251>> = sumcheck::Prover::<Triangles<F251>>::new(g);
 	// OVERHEAD
 	let mut gi = p.gen_uni_polynomial(None);
 	lookup.push(gi.clone());
@@ -32,34 +19,21 @@ fn build_gi_lookup(g: &Triangles) -> Vec<sumcheck::UniPoly> {
 	lookup
 }
 
-// Steps being benchmarked
-// fn verifier_steps_only(p: &sumcheck::Prover<Triangles>, gi_lookup: &Vec<sumcheck::UniPoly>, r: Option<F251>) {
-// 	let mut v: Verifier<UniPoly, Triangles> = Verifier::new(*G_1_SUM, G_1.clone());
-// 	while v.current_round != Some(sumcheck::Round::Final()) {
-// 		let gi = gi_lookup[v.r_vec.len()].clone();
-// 		v.verify(Some(gi));
-// 	}
-
-// 	// final round
-// 	v.verify(None);
-// }
-
-// Verifier benchmark
-// #[bench]
 fn bench_verifier(c: &mut Criterion) {
 	let mut group = c.benchmark_group("verifier");
 
-	let matrix_sizes = [4, 8, 16, 32, 64];
+	let matrix_sizes = [4, 8, 16, 32];
 	for size in matrix_sizes {
 		let matrix: Vec<Vec<F251>> = thaler::utils::gen_matrix(size);
-		let g: Triangles = thaler::triangles::Triangles::new(matrix.clone());
-		let p: Prover<Triangles> = sumcheck::Prover::new(&g.clone());
+		let g: Triangles<F251> = thaler::triangles::Triangles::new(matrix.clone());
+		let p: Prover<Triangles<F251>> = sumcheck::Prover::new(&g.clone());
 		let g_sum = p.slow_sum_g();
 		let lookup = build_gi_lookup(&g);
 	
-		let mut v: Verifier<UniPoly, Triangles> = Verifier::new(g_sum, Rc::new(g.clone()));
+		let mut v: Verifier<UniPoly, Triangles<F251>> = Verifier::new(g_sum, Rc::new(g.clone()));
 		v.random_func(|| F251::from(1));
 		
+		//todo figure an easy way to add bench for different algo implementations
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("verifier with vars", lookup.len()), 
 			|b| {

@@ -1,9 +1,9 @@
-use std::{iter, ops::Div};
+use std::{iter};
 
-use ark_ff::{Zero, PrimeField, Field};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
+use ark_ff::{Field};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}};
 
-use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle, eval_dynamic_mle, poly_constant}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{lagrange::{poly_slow_mle, naive_mul, dynamic_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct Matrix <F: Field>  {
@@ -16,15 +16,6 @@ pub struct Triangles <F: Field> {
     f_xy: SparsePolynomial<F, SparseTerm>,
     f_yz: SparsePolynomial<F, SparseTerm>,
     f_xz: SparsePolynomial<F, SparseTerm>,
-}
-
-fn println_matrix(matrix: Vec<Vec<F251>>) {
-    (0..matrix.len()).for_each(|i| {
-        for _j in 0..matrix[i].len() {
-            // print!("{} ", matrix[i][j].into_bigint().as_ref()[0]);
-        }
-        //println!("");
-    });
 }
 
 pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
@@ -75,7 +66,6 @@ impl <F: Field> Matrix<F> {
     }
 }
 
-// todo split into triangles_mle and triangles_matrix traits?
 impl <F: Field> Triangles <F> {
     pub fn new(matrix: Vec<Vec<F>>) -> Self {
         let _matrix = Matrix { vec: matrix };
@@ -86,7 +76,6 @@ impl <F: Field> Triangles <F> {
         let y_start_index = var_num;
         let z_start_index = var_num * 2;
         
-        // todo optimize these indexes. might use need to use range represent by int
         let x_indexes = gen_var_indexes(x_start_index, var_num);
         let y_indexes = gen_var_indexes(y_start_index, var_num);
         let mut xy_indexes: Vec<usize> = x_indexes.clone();
@@ -100,8 +89,7 @@ impl <F: Field> Triangles <F> {
         let mut xz_indexes: Vec<usize> = x_indexes;
         xz_indexes.append(&mut z_indexes);
 
-        //clean up
-        
+        //optimize these polynomial representations
         let poly_exist_xy = poly_slow_mle(&a, &xy_indexes);
         let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
         let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
@@ -275,9 +263,9 @@ impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
         // let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
         // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
         // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
-        let xy_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
-        let yz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
-        let xz_eval = eval_dynamic_mle(&self.matrix.flatten(), &point_xz);
+        let xy_eval = dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
+        let yz_eval = dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
+        let xz_eval = dynamic_mle(&self.matrix.flatten(), &point_xz);
 
         xy_eval * yz_eval * xz_eval
         // ark_poly::Polynomial::evaluate(&xy_eval, &vec![]) * 

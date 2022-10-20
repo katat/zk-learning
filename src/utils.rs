@@ -1,4 +1,4 @@
-use ark_ff::{Zero, One};
+use ark_ff::{Zero, One, Field};
 use crate::small_fields::F251;
 
 pub fn gen_matrix (len: usize) -> Vec<Vec<F251>> {
@@ -18,4 +18,8 @@ pub fn gen_matrix (len: usize) -> Vec<Vec<F251>> {
 	matrix[0][len - 1] = F251::zero();
 	matrix[len - 1][0] = F251::zero();
 	matrix
+}
+
+pub fn convert_field<F: Field>(vec: &[u32]) -> Vec<F> {
+	vec.iter().map(|e| F::from(*e)).collect()
 }

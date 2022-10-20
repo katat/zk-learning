@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-use ark_ff::{Field, Zero};
-use ark_ff::{One};
+use ark_ff::{Field};
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
@@ -97,7 +96,6 @@ impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P
 	}
 
 	fn generate_random(&mut self) -> F251 {
-		// todo see if criterion benching can avoid changing these randoms
 		let mut rng = rand::thread_rng();
 		let mut r = rng.gen();
 
