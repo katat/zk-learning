@@ -78,10 +78,9 @@ impl Triangles {
 
         //clean up
         
-        let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect::<Vec<i128>>();
-        let poly_exist_xy = poly_slow_mle(&converted_a, &xy_indexes);
-        let poly_exist_yz = poly_slow_mle(&converted_a, &yz_indexes);
-        let poly_exist_xz = poly_slow_mle(&converted_a, &xz_indexes);
+        let poly_exist_xy = poly_slow_mle(&a, &xy_indexes);
+        let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
+        let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
 
         Triangles {
             matrix: _matrix,
@@ -181,10 +180,9 @@ impl Triangles {
 
         //clean up
         
-        let converted_a = a.into_iter().map(|e| e.into_bigint().as_ref()[0] as i128).collect::<Vec<i128>>();
-        let poly_exist_xy = poly_slow_mle(&converted_a, &xy_indexes);
-        let poly_exist_yz = poly_slow_mle(&converted_a, &yz_indexes);
-        let poly_exist_xz = poly_slow_mle(&converted_a, &xz_indexes);
+        let poly_exist_xy = poly_slow_mle(&a, &xy_indexes);
+        let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
+        let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
 
         println!("poly xz {}", poly_exist_xz.terms.len());
         naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz)
