@@ -29,17 +29,17 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
 
 pub trait SumCheckPolynomial<F> {
     fn terms(&self) -> Vec<(F, SparseTerm)>;
-	fn var_fixed_evaluate<C>(&self, cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly;
+	fn var_fixed_evaluate<C>(&self, cb: C) -> UniPoly where C: FnMut((F, SparseTerm)) -> UniPoly;
     fn num_vars(&self) -> usize;
     fn evaluate(&self, point: &Vec<F>) -> F;
 }
 
-impl SumCheckPolynomial<F251> for SparsePolynomial<F251, SparseTerm> {
-    fn terms(&self) -> Vec<(F251, SparseTerm)> {
+impl <F: Field> SumCheckPolynomial<F> for SparsePolynomial<F, SparseTerm> {
+    fn terms(&self) -> Vec<(F, SparseTerm)> {
 		self.terms.to_vec()
     }
 
-    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly {
+    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F, SparseTerm)) -> UniPoly {
         self.terms().clone().into_iter().fold(
 			UniPoly::from_coefficients_vec(vec![]),
 			|sum, term| {
@@ -54,7 +54,7 @@ impl SumCheckPolynomial<F251> for SparsePolynomial<F251, SparseTerm> {
 		self.num_vars
     }
 
-    fn evaluate(&self, point: &Vec<F251>) -> F251 {
+    fn evaluate(&self, point: &Vec<F>) -> F {
         Polynomial::evaluate(self, point)
     }
 }

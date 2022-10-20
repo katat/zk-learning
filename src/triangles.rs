@@ -1,21 +1,21 @@
 use std::{iter, ops::Div};
 
-use ark_ff::{Zero, PrimeField};
+use ark_ff::{Zero, PrimeField, Field};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, Polynomial};
 
 use crate::{small_fields::{F251}, lagrange::{poly_slow_mle, naive_mul, eval_slow_mle, eval_dynamic_mle, poly_constant}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
-pub struct Matrix {
-    vec: Vec<Vec<F251>>
+pub struct Matrix <F: Field>  {
+    vec: Vec<Vec<F>>
 }
 
 #[derive(Debug, Clone)]
-pub struct Triangles {
-	pub matrix: Matrix,
-    f_xy: SparsePolynomial<F251, SparseTerm>,
-    f_yz: SparsePolynomial<F251, SparseTerm>,
-    f_xz: SparsePolynomial<F251, SparseTerm>,
+pub struct Triangles <F: Field> {
+	pub matrix: Matrix<F>,
+    f_xy: SparsePolynomial<F, SparseTerm>,
+    f_yz: SparsePolynomial<F, SparseTerm>,
+    f_xz: SparsePolynomial<F, SparseTerm>,
 }
 
 fn println_matrix(matrix: Vec<Vec<F251>>) {
@@ -27,13 +27,38 @@ fn println_matrix(matrix: Vec<Vec<F251>>) {
     });
 }
 
-impl Matrix {
-    pub fn new(m: Vec<Vec<F251>>) -> Self {
+pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
+    let arr: Vec<usize> = (0..var_num).map(|x| x + start_index).collect();
+    arr
+}
+
+pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
+    let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
+    let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
+    let bin = format!("{}{}", xbin, ybin);
+    let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
+        .collect();
+    x
+}
+
+//TODO refactor for more efficient
+pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
+    let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
+    let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
+    let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
+    let bin = format!("{}{}{}", xbin, ybin, zbin);
+    let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
+        .collect();
+    x
+}
+
+impl <F: Field> Matrix<F> {
+    pub fn new(m: Vec<Vec<F>>) -> Self {
         Matrix {
             vec: m
         }
     }
-    pub fn flatten(&self) -> Vec<F251>{
+    pub fn flatten(&self) -> Vec<F>{
         self.vec.iter().flatten().cloned().collect()
     }
 
@@ -45,17 +70,16 @@ impl Matrix {
         (self.size() as f32).log2() as usize
     }
 
-    pub fn get(&self, x: usize, y: usize) -> F251 {
+    pub fn get(&self, x: usize, y: usize) -> F {
         self.vec[x][y]
     }
 }
 
 // todo split into triangles_mle and triangles_matrix traits?
-impl Triangles {
-    //todo make Vec<Vec<F251>> type generic
-    pub fn new(matrix: Vec<Vec<F251>>) -> Self {
+impl <F: Field> Triangles <F> {
+    pub fn new(matrix: Vec<Vec<F>>) -> Self {
         let _matrix = Matrix { vec: matrix };
-        let a: Vec<F251> = _matrix.flatten();
+        let a: Vec<F> = _matrix.flatten();
         let var_num = _matrix.var_num();
     
         let x_start_index = 0;
@@ -63,12 +87,12 @@ impl Triangles {
         let z_start_index = var_num * 2;
         
         // todo optimize these indexes. might use need to use range represent by int
-        let x_indexes = Triangles::gen_var_indexes(x_start_index, var_num);
-        let y_indexes = Triangles::gen_var_indexes(y_start_index, var_num);
+        let x_indexes = gen_var_indexes(x_start_index, var_num);
+        let y_indexes = gen_var_indexes(y_start_index, var_num);
         let mut xy_indexes: Vec<usize> = x_indexes.clone();
         xy_indexes.append(&mut y_indexes.clone());
     
-        let mut z_indexes = Triangles::gen_var_indexes(z_start_index, var_num);
+        let mut z_indexes = gen_var_indexes(z_start_index, var_num);
     
         let mut yz_indexes: Vec<usize> = y_indexes;
         yz_indexes.append(&mut z_indexes.clone());
@@ -90,16 +114,15 @@ impl Triangles {
         }
     }
 
-    pub fn multiply(&self, matrix: Matrix) -> Matrix {
+    pub fn multiply(&self, matrix: Matrix<F>) -> Matrix<F> {
         let size = self.matrix.size();
-        let row: Vec<F251> = iter::repeat(F251::zero()).take(size).collect();
-        let mut result_matrix: Vec<Vec<F251>> = iter::repeat(row).take(size).collect();
+        let row: Vec<F> = iter::repeat(F::zero()).take(size).collect();
+        let mut result_matrix: Vec<Vec<F>> = iter::repeat(row).take(size).collect();
         for i in 0..size {
             for j in 0..size {
-                let mut elm = F251::zero();
+                let mut elm = F::zero();
                 for k in 0..size {
                     elm += self.matrix.get(i, k) * matrix.get(k, j);
-                    // println!("{}", matrix[k][j]);
                 }
                 result_matrix[i][j] = elm;
             }
@@ -110,54 +133,20 @@ impl Triangles {
         }
     }
 
-    pub fn count(&self) -> F251 {
+    pub fn count(&self) -> F {
         let a2 = self.multiply(self.matrix.clone());
         let a3 = self.multiply(a2);
-        let mut number = F251::zero();
+        let mut number = F::zero();
 
         for i in 0..a3.size() {
             number += a3.get(i, i);
         }
 
-        number.div(F251::from(6))
+        number.div(F::from(6u32))
     }
 
-    pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
-        let arr: Vec<usize> = (0..var_num).map(|x| x + start_index).collect();
-        arr
-    }
-
-    pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
-        let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
-        let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
-        let bin = format!("{}{}", xbin, ybin);
-        //println!("{}", bin);
-        // // //println!("x: {:?}", x);
-        let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
-            .collect();
-        x
-    }
-    
-    pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
-        let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
-        let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
-        let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
-        let bin = format!("{}{}{}", xbin, ybin, zbin);
-        //println!("{}", bin);
-        // // //println!("x: {:?}", x);
-        let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
-            .collect();
-        x
-    }
-    
-    pub fn convert_bin_vec (bin: Vec<u32>) -> Vec<i128> {
-        bin.iter()
-            .map(|i| i.to_string().parse::<i128>().unwrap())
-            .collect()
-    }
-    
-    pub fn poly_count_triangles(&self) -> SparsePolynomial<F251, SparseTerm> {
-        let a: Vec<F251> = self.matrix.flatten();
+    pub fn poly_count_triangles(&self) -> SparsePolynomial<F, SparseTerm> {
+        let a: Vec<F> = self.matrix.flatten();
     
         let var_num = self.matrix.var_num();
     
@@ -165,12 +154,12 @@ impl Triangles {
         let x_start_index = 0;
         let y_start_index = var_num;
         let z_start_index = var_num * 2;
-        let x_indexes = Triangles::gen_var_indexes(x_start_index, var_num);
-        let y_indexes = Triangles::gen_var_indexes(y_start_index, var_num);
+        let x_indexes = gen_var_indexes(x_start_index, var_num);
+        let y_indexes = gen_var_indexes(y_start_index, var_num);
         let mut xy_indexes: Vec<usize> = x_indexes.clone();
         xy_indexes.append(&mut y_indexes.clone());
     
-        let mut z_indexes = Triangles::gen_var_indexes(z_start_index, var_num);
+        let mut z_indexes = gen_var_indexes(z_start_index, var_num);
     
         let mut yz_indexes: Vec<usize> = y_indexes;
         yz_indexes.append(&mut z_indexes.clone());
@@ -188,35 +177,30 @@ impl Triangles {
         naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz)
     }
 
-    pub fn count_by_mle(&self) -> i128 {
+    pub fn count_by_mle(&self) -> F {
         let poly_exist = self.poly_count_triangles();
         let len = self.matrix.size();
         let var_num = self.matrix.var_num();
-        let mut total_triangles = 0;
+        let mut total_triangles = F::zero();
     
         for x in 0..len {
             for y in 0..len {
                 for z in 0..len {
-                    let xyz_bin = Triangles::convert_bin_vec(Triangles::convert_bin_z(x, y, z, var_num));
-                    let r: Vec<F251> = xyz_bin.iter().map(|i| F251::from(*i)).collect();
+                    let xyz_bin = convert_bin_z(x, y, z, var_num);
+                    let r: Vec<F> = xyz_bin.iter().map(|i| F::from(*i)).collect();
     
                     let result = ark_poly::Polynomial::evaluate(&poly_exist, &r);
-                    let exist = result.into_bigint().as_ref()[0];
-    
-                    if exist != 0 {
-                        //println!("exist {} at x: {}, y: {}, z: {}", exist, x, y, z);
-                    }
-                    total_triangles += exist;
+                    total_triangles += result;
                 }
             }
         }
     
-        total_triangles as i128 / 6
+        total_triangles.div(F::from(6u32))
     
     }
 }
 
-fn mul(cur: Vec<(F251, SparseTerm)>, other: Vec<(F251, SparseTerm)>) -> Vec<(F251, SparseTerm)> {
+fn mul<F: Field>(cur: Vec<(F, SparseTerm)>, other: Vec<(F, SparseTerm)>) -> Vec<(F, SparseTerm)> {
     let mut result_terms = Vec::new();
     for (cur_coeff, cur_term) in cur.iter() {
         for (other_coeff, other_term) in other.iter() {
@@ -225,21 +209,41 @@ fn mul(cur: Vec<(F251, SparseTerm)>, other: Vec<(F251, SparseTerm)>) -> Vec<(F25
                 other_term.vars().iter().zip(other_term.powers()).map(|(v, p)| (*v, p))
             );
             let coeff = *cur_coeff * *other_coeff;
-            // //println!("naive mul coeff: {}, cur_coeff: {}, other_coeff: {}", coeff, cur_coeff, other_coeff);
             result_terms.push((coeff, SparseTerm::new(term)));
         }
     }
     result_terms
 }
 
-impl SumCheckPolynomial<F251> for Triangles {
-    fn terms(&self) -> Vec<(F251, SparseTerm)> {
-        // [
-        //     self.f_xy.terms.clone(), 
-        //     self.f_yz.terms.clone(), 
-        //     self.f_xz.terms.clone()
-        // ].concat()
+impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
+    fn terms(&self) -> Vec<(F, SparseTerm)> {
         mul(mul(self.f_xy.terms.clone(), self.f_yz.terms.clone()), self.f_xz.terms.clone())
+    }
+
+    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F, SparseTerm)) -> UniPoly {
+
+        let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		);
+        let f_yz_unipoly: UniPoly = self.f_yz.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		);
+        let f_xz_unipoly: UniPoly = self.f_xz.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, term| {
+				let curr = cb(term);
+				sum + curr
+			}
+		);
+        f_xy_unipoly.mul(&f_yz_unipoly).mul(&f_xz_unipoly)
     }
 
     fn num_vars(&self) -> usize {
@@ -250,7 +254,7 @@ impl SumCheckPolynomial<F251> for Triangles {
         ].iter().max().unwrap()
     }
 
-    fn evaluate(&self, point: &Vec<F251>) -> F251 {
+    fn evaluate(&self, point: &Vec<F>) -> F {
         let y_start_index = self.matrix.var_num();
         let z_start_index = self.matrix.var_num() * 2;
         let point_xy = &point[0..(z_start_index)];
@@ -282,31 +286,5 @@ impl SumCheckPolynomial<F251> for Triangles {
 
         // xy_evaluation * yz_evaluation * xz_evaluation
         // xy_evaluation
-    }
-
-    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F251, SparseTerm)) -> UniPoly {
-
-        let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		);
-        let f_yz_unipoly: UniPoly = self.f_yz.terms.clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		);
-        let f_xz_unipoly: UniPoly = self.f_xz.terms.clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		);
-        f_xy_unipoly.mul(&f_yz_unipoly).mul(&f_xz_unipoly)
     }
 }

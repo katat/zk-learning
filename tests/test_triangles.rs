@@ -19,8 +19,6 @@ fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
         row.push(v);
     }
 
-    //println!("a3 {:#?}", matrix);
-
     matrix
 }
 
@@ -34,20 +32,20 @@ lazy_static! {
 }
 
 #[rstest]
-#[case(&M_1, 2)]
+#[case(&M_1, F251::from(2))]
 fn naive_count_test(
 	#[case] m: &Vec<Vec<F251>>,
-	#[case] expected: i128,
+	#[case] expected: F251,
 ) {
     let triangles = Triangles::new(m.to_vec());
 	assert_eq!(triangles.count(), F251::from(expected));
 }
 
 #[rstest]
-#[case(&M_1, 2)]
+#[case(&M_1, F251::from(2))]
 fn slow_mle_count_test(
 	#[case] m: &Vec<Vec<F251>>,
-	#[case] expected: i128,
+	#[case] expected: F251,
 ) {
     let triangles = Triangles::new(m.to_vec());
 	assert_eq!(triangles.count_by_mle(), expected);

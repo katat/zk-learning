@@ -148,7 +148,7 @@ pub fn eval_poly_chi_step<F: Field>(w: bool, x: &SparsePolynomial<F, SparseTerm>
 	)
 }
 
-pub fn eval_memoize(r: &Vec<F251>, v: usize) -> Vec<F251> {
+pub fn eval_memoize<F: Field>(r: &Vec<F>, v: usize) -> Vec<F> {
 	match v {
 		1 => {
 			vec![eval_chi_step(false, r[v - 1]), eval_chi_step(true, r[v - 1])]
@@ -165,7 +165,7 @@ pub fn eval_memoize(r: &Vec<F251>, v: usize) -> Vec<F251> {
 	}
 }
 
-pub fn eval_dynamic_mle(fw: &Vec<F251>, r: &Vec<F251>) -> F251 {
+pub fn eval_dynamic_mle<F: Field>(fw: &Vec<F>, r: &Vec<F>) -> F {
 	let chi_lookup = eval_memoize(r, r.len());
 	fw.iter()
 		.zip(chi_lookup.iter())
