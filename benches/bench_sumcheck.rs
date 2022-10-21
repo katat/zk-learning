@@ -1,14 +1,14 @@
 use std::rc::Rc;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
-use thaler::triangles::{Triangles, MLEAlgorithm, Matrix};
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
+use thaler::triangles::{TriangleMLE, MLEAlgorithm, TriangleGraph};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
 // a gi lookup table
-fn build_gi_lookup(g: &Triangles<F251>) -> Vec<sumcheck::UniPoly> {
+fn build_gi_lookup(g: &TriangleMLE<F251>) -> Vec<sumcheck::UniPoly> {
 	let r: Option<F251> = Some(1u32.into());
 	let mut lookup= vec![];
-	let mut p: Prover<Triangles<F251>> = sumcheck::Prover::<Triangles<F251>>::new(g);
+	let mut p: Prover<TriangleMLE<F251>> = sumcheck::Prover::<TriangleMLE<F251>>::new(g);
 	// OVERHEAD
 	let mut gi = p.gen_uni_polynomial(None);
 	lookup.push(gi.clone());
@@ -29,10 +29,11 @@ fn bench_verifier_steps(c: &mut Criterion) {
 		MLEAlgorithm::StreamMLE,
 	];
 	for size in matrix_sizes {
-		let matrix = Matrix::new(thaler::utils::gen_matrix(size));
+		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
 
+		let num_vars = matrix.one_dimension_size() * 3;
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>("count triangles with size", matrix.var_num()), 
+			BenchmarkId::new::<&str, usize>("count triangles in vars", num_vars), 
 			|b| {
 				b.iter(|| {
 					matrix.count()
@@ -41,13 +42,15 @@ fn bench_verifier_steps(c: &mut Criterion) {
 		);
 
 		for eval_type in eval_types {
-			let g: Triangles<F251> = matrix.derive_mle(eval_type.clone());
-			let p: Prover<Triangles<F251>> = sumcheck::Prover::new(&g.clone());
+			let g: TriangleMLE<F251> = matrix.derive_mle(eval_type.clone());
+			let p: Prover<TriangleMLE<F251>> = sumcheck::Prover::new(&g.clone());
 			let g_sum = p.slow_sum_g();
 			let lookup = build_gi_lookup(&g);
 		
-			let mut v: Verifier<UniPoly, Triangles<F251>> = Verifier::new(g_sum, Rc::new(g.clone()));
+			let mut v: Verifier<UniPoly, TriangleMLE<F251>> = Verifier::new(g_sum, Rc::new(g.clone()));
 			v.random_func(|| F251::from(1));
+
+			assert_eq!(num_vars, lookup.len());
 			
 			group.bench_function(
 				BenchmarkId::new::<&str, usize>(&format!("verifier with eval {:?} in vars", eval_type), lookup.len()), 
@@ -79,8 +82,8 @@ fn bench_prover_lookup_build(c: &mut Criterion) {
 
 	let matrix_sizes = [4];
 	for size in matrix_sizes {
-		let matrix = Matrix::new(thaler::utils::gen_matrix(size));
-		let g: Triangles<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
+		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
+		let g: TriangleMLE<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("prover for size", size), 
 			|b| {

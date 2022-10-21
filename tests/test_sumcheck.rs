@@ -6,7 +6,7 @@ use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use rstest::rstest;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, MultiPoly};
-use thaler::triangles::{Triangles, Matrix, MLEAlgorithm};
+use thaler::triangles::{TriangleMLE, TriangleGraph, MLEAlgorithm};
 
 lazy_static! {
 	static ref G_0: MultiPoly = SparsePolynomial::from_coefficients_vec(
@@ -30,9 +30,9 @@ lazy_static! {
 	);
 	static ref G_1_SUM: F251 = sumcheck::Prover::<MultiPoly>::new(&G_1).slow_sum_g();
 
-	static ref M: Matrix<F251> = Matrix::new(thaler::utils::gen_matrix(4));
-	static ref G_2: Triangles<F251> = M.derive_mle(MLEAlgorithm::DynamicMLE);
-	static ref G_2_SUM: F251 = sumcheck::Prover::<Triangles<F251>>::new(&G_2).slow_sum_g();
+	static ref M: TriangleGraph<F251> = TriangleGraph::new(thaler::utils::gen_matrix(4));
+	static ref G_2: TriangleMLE<F251> = M.derive_mle(MLEAlgorithm::DynamicMLE);
+	static ref G_2_SUM: F251 = sumcheck::Prover::<TriangleMLE<F251>>::new(&G_2).slow_sum_g();
 
 }
 
@@ -45,6 +45,6 @@ fn sumcheck_multi_poly_test(#[case] p: &sumcheck::MultiPoly, #[case] c: &F251) {
 
 #[rstest]
 #[case(&G_2, &G_2_SUM)]
-fn sumcheck_triangles_test(#[case] p: &Triangles<F251>, #[case] c: &F251) {
-	assert!(sumcheck::verify::<Triangles<F251>>(p, *c));
+fn sumcheck_triangles_test(#[case] p: &TriangleMLE<F251>, #[case] c: &F251) {
+	assert!(sumcheck::verify::<TriangleMLE<F251>>(p, *c));
 }

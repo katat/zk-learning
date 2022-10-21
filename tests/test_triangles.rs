@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use rstest::rstest;
-use thaler::{small_fields::F251, triangles::{Matrix, MLEAlgorithm}};
+use thaler::{small_fields::F251, triangles::{TriangleGraph}};
 
 fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
     let len = (m.len() as f64).sqrt() as usize;
@@ -37,6 +37,6 @@ fn naive_count_test(
 	#[case] m: &[Vec<F251>],
 	#[case] expected: F251,
 ) {
-    let matrix = Matrix::new(m.to_vec());
+    let matrix = TriangleGraph::new(m.to_vec());
 	assert_eq!(matrix.count(), expected);
 }

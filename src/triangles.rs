@@ -3,18 +3,16 @@ use std::{iter};
 use ark_ff::{Field};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}};
 
-use crate::{lagrange::{poly_slow_mle, naive_mul, dynamic_mle, slow_mle, stream_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{lagrange::{poly_slow_mle, dynamic_mle, slow_mle, stream_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
-pub struct Matrix <F: Field>  {
+pub struct TriangleGraph <F: Field>  {
     vec: Vec<Vec<F>>
 }
 
-//refactor this to be the base of the triangle poly
-//matrix holds the evaluation, then its generate func to derive triangle mle
-impl <F: Field> Matrix<F> {
+impl <F: Field> TriangleGraph<F> {
     pub fn new(m: Vec<Vec<F>>) -> Self {
-        Matrix {
+        TriangleGraph {
             vec: m
         }
     }
@@ -26,7 +24,7 @@ impl <F: Field> Matrix<F> {
         (self.flatten().len() as f32).sqrt() as usize
     }
 
-    pub fn var_num(&self) -> usize {
+    pub fn one_dimension_size(&self) -> usize {
         (self.size() as f32).log2() as usize
     }
 
@@ -34,7 +32,7 @@ impl <F: Field> Matrix<F> {
         self.vec[x][y]
     }
 
-    pub fn multiply(&self, matrix: Matrix<F>) -> Matrix<F> {
+    pub fn multiply(&self, matrix: TriangleGraph<F>) -> TriangleGraph<F> {
         let size = self.size();
         let row: Vec<F> = iter::repeat(F::zero()).take(size).collect();
         let mut result_matrix: Vec<Vec<F>> = iter::repeat(row).take(size).collect();
@@ -48,7 +46,7 @@ impl <F: Field> Matrix<F> {
             }
         }
 
-        Matrix {
+        TriangleGraph {
             vec: result_matrix
         }
     }
@@ -65,8 +63,8 @@ impl <F: Field> Matrix<F> {
         number.div(F::from(6u32))
     }
 
-    pub fn derive_mle(&self, mode: MLEAlgorithm) -> Triangles<F> {
-        Triangles::new(self.clone(), mode)
+    pub fn derive_mle(&self, mode: MLEAlgorithm) -> TriangleMLE<F> {
+        TriangleMLE::new(self.clone(), mode)
     }
 }
 
@@ -78,8 +76,8 @@ pub enum MLEAlgorithm {
 }
 
 #[derive(Debug, Clone)]
-pub struct Triangles <F: Field> {
-	pub matrix: Matrix<F>,
+pub struct TriangleMLE <F: Field> {
+	pub matrix: TriangleGraph<F>,
     f_xy: SparsePolynomial<F, SparseTerm>,
     f_yz: SparsePolynomial<F, SparseTerm>,
     f_xz: SparsePolynomial<F, SparseTerm>,
@@ -111,10 +109,10 @@ pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
     x
 }
 
-impl <F: Field> Triangles <F> {
-    pub fn new(matrix: Matrix<F>, eval_type: MLEAlgorithm) -> Self {
+impl <F: Field> TriangleMLE <F> {
+    pub fn new(matrix: TriangleGraph<F>, eval_type: MLEAlgorithm) -> Self {
         let a: Vec<F> = matrix.flatten();
-        let var_num = matrix.var_num();
+        let var_num = matrix.one_dimension_size();
     
         let x_start_index = 0;
         let y_start_index = var_num;
@@ -138,7 +136,7 @@ impl <F: Field> Triangles <F> {
         let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
         let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
 
-        Triangles {
+        TriangleMLE {
             matrix,
             f_xy: poly_exist_xy,
             f_yz: poly_exist_yz,
@@ -163,7 +161,7 @@ fn mul<F: Field>(cur: Vec<(F, SparseTerm)>, other: Vec<(F, SparseTerm)>) -> Vec<
     result_terms
 }
 
-impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
+impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
     fn terms(&self) -> Vec<(F, SparseTerm)> {
         mul(mul(self.f_xy.terms.clone(), self.f_yz.terms.clone()), self.f_xz.terms.clone())
     }
@@ -203,10 +201,10 @@ impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
     }
 
     fn evaluate(&self, point: &Vec<F>) -> F {
-        let y_start_index = self.matrix.var_num();
-        let z_start_index = self.matrix.var_num() * 2;
+        let y_start_index = self.matrix.one_dimension_size();
+        let z_start_index = self.matrix.one_dimension_size() * 2;
         let point_xy = &point[0..(z_start_index)];
-        let point_yz = &point[y_start_index..(z_start_index + self.matrix.var_num())];
+        let point_yz = &point[y_start_index..(z_start_index + self.matrix.one_dimension_size())];
         let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
 
         // let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
