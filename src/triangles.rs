@@ -34,6 +34,37 @@ impl <F: Field> Matrix<F> {
         self.vec[x][y]
     }
 
+    pub fn multiply(&self, matrix: Matrix<F>) -> Matrix<F> {
+        let size = self.size();
+        let row: Vec<F> = iter::repeat(F::zero()).take(size).collect();
+        let mut result_matrix: Vec<Vec<F>> = iter::repeat(row).take(size).collect();
+        for i in 0..size {
+            for j in 0..size {
+                let mut elm = F::zero();
+                for k in 0..size {
+                    elm += self.get(i, k) * matrix.get(k, j);
+                }
+                result_matrix[i][j] = elm;
+            }
+        }
+
+        Matrix {
+            vec: result_matrix
+        }
+    }
+
+    pub fn count(&self) -> F {
+        let a2 = self.multiply(self.clone());
+        let a3 = self.multiply(a2);
+        let mut number = F::zero();
+
+        for i in 0..a3.size() {
+            number += a3.get(i, i);
+        }
+
+        number.div(F::from(6u32))
+    }
+
     pub fn derive_mle(&self, mode: MLEAlgorithm) -> Triangles<F> {
         Triangles::new(self.clone(), mode)
     }
@@ -114,91 +145,6 @@ impl <F: Field> Triangles <F> {
             f_xz: poly_exist_xz,
             eval_type,
         }
-    }
-
-    pub fn multiply(&self, matrix: Matrix<F>) -> Matrix<F> {
-        let size = self.matrix.size();
-        let row: Vec<F> = iter::repeat(F::zero()).take(size).collect();
-        let mut result_matrix: Vec<Vec<F>> = iter::repeat(row).take(size).collect();
-        for i in 0..size {
-            for j in 0..size {
-                let mut elm = F::zero();
-                for k in 0..size {
-                    elm += self.matrix.get(i, k) * matrix.get(k, j);
-                }
-                result_matrix[i][j] = elm;
-            }
-        }
-
-        Matrix {
-            vec: result_matrix
-        }
-    }
-
-    pub fn count(&self) -> F {
-        let a2 = self.multiply(self.matrix.clone());
-        let a3 = self.multiply(a2);
-        let mut number = F::zero();
-
-        for i in 0..a3.size() {
-            number += a3.get(i, i);
-        }
-
-        number.div(F::from(6u32))
-    }
-
-    pub fn poly_count_triangles(&self) -> SparsePolynomial<F, SparseTerm> {
-        let a: Vec<F> = self.matrix.flatten();
-    
-        let var_num = self.matrix.var_num();
-    
-        // encapsulate them as first/second/third...
-        let x_start_index = 0;
-        let y_start_index = var_num;
-        let z_start_index = var_num * 2;
-        let x_indexes = gen_var_indexes(x_start_index, var_num);
-        let y_indexes = gen_var_indexes(y_start_index, var_num);
-        let mut xy_indexes: Vec<usize> = x_indexes.clone();
-        xy_indexes.append(&mut y_indexes.clone());
-    
-        let mut z_indexes = gen_var_indexes(z_start_index, var_num);
-    
-        let mut yz_indexes: Vec<usize> = y_indexes;
-        yz_indexes.append(&mut z_indexes.clone());
-        
-        let mut xz_indexes: Vec<usize> = x_indexes;
-        xz_indexes.append(&mut z_indexes);
-
-        //clean up
-        
-        let poly_exist_xy = poly_slow_mle(&a, &xy_indexes);
-        let poly_exist_yz = poly_slow_mle(&a, &yz_indexes);
-        let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
-
-        println!("poly xz {}", poly_exist_xz.terms.len());
-        naive_mul(&naive_mul(&poly_exist_xy, &poly_exist_yz), &poly_exist_xz)
-    }
-
-    pub fn count_by_mle(&self) -> F {
-        let poly_exist = self.poly_count_triangles();
-        let len = self.matrix.size();
-        let var_num = self.matrix.var_num();
-        let mut total_triangles = F::zero();
-    
-        for x in 0..len {
-            for y in 0..len {
-                for z in 0..len {
-                    let xyz_bin = convert_bin_z(x, y, z, var_num);
-                    let r: Vec<F> = xyz_bin.iter().map(|i| F::from(*i)).collect();
-    
-                    let result = ark_poly::Polynomial::evaluate(&poly_exist, &r);
-                    total_triangles += result;
-                }
-            }
-        }
-    
-        total_triangles.div(F::from(6u32))
-    
     }
 }
 
@@ -292,11 +238,5 @@ impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
                 xy_eval * yz_eval * xz_eval
             },
         }
-        // ark_poly::Polynomial::evaluate(&xy_eval, &vec![]) * 
-        // ark_poly::Polynomial::evaluate(&yz_eval, &vec![]) * 
-        // ark_poly::Polynomial::evaluate(&xz_eval, &vec![]) 
-
-        // xy_evaluation * yz_evaluation * xz_evaluation
-        // xy_evaluation
     }
 }

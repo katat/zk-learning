@@ -31,12 +31,11 @@ fn bench_verifier_steps(c: &mut Criterion) {
 	for size in matrix_sizes {
 		let matrix = Matrix::new(thaler::utils::gen_matrix(size));
 
-		let g: Triangles<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>("count triangles with size", g.num_vars()), 
+			BenchmarkId::new::<&str, usize>("count triangles with size", matrix.var_num()), 
 			|b| {
 				b.iter(|| {
-					g.count()
+					matrix.count()
 				});
 			}
 		);
