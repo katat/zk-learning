@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
-use thaler::triangles::{Triangles, PolynomialEvalType, Matrix};
+use thaler::triangles::{Triangles, MLEAlgorithm, Matrix};
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
 
 // a gi lookup table
@@ -24,14 +24,14 @@ fn bench_verifier_steps(c: &mut Criterion) {
 
 	let matrix_sizes = [4, 8, 16, 32];
 	let eval_types = &[
-		PolynomialEvalType::SLOW_MLE,
-		PolynomialEvalType::DYNAMIC_MLE,
-		PolynomialEvalType::STREAM_MLE,
+		MLEAlgorithm::SlowMLE,
+		MLEAlgorithm::DynamicMLE,
+		MLEAlgorithm::StreamMLE,
 	];
 	for size in matrix_sizes {
 		let matrix = Matrix::new(thaler::utils::gen_matrix(size));
 
-		let g: Triangles<F251> = matrix.derive_mle(PolynomialEvalType::DYNAMIC_MLE);
+		let g: Triangles<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("count triangles with size", g.num_vars()), 
 			|b| {
@@ -81,7 +81,7 @@ fn bench_prover_lookup_build(c: &mut Criterion) {
 	let matrix_sizes = [4];
 	for size in matrix_sizes {
 		let matrix = Matrix::new(thaler::utils::gen_matrix(size));
-		let g: Triangles<F251> = matrix.derive_mle(PolynomialEvalType::DYNAMIC_MLE);
+		let g: Triangles<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("prover for size", size), 
 			|b| {

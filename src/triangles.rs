@@ -34,16 +34,16 @@ impl <F: Field> Matrix<F> {
         self.vec[x][y]
     }
 
-    pub fn derive_mle(&self, mode: PolynomialEvalType) -> Triangles<F> {
+    pub fn derive_mle(&self, mode: MLEAlgorithm) -> Triangles<F> {
         Triangles::new(self.clone(), mode)
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum PolynomialEvalType {
-    SLOW_MLE,
-    DYNAMIC_MLE,
-    STREAM_MLE,
+pub enum MLEAlgorithm {
+    SlowMLE,
+    DynamicMLE,
+    StreamMLE,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ pub struct Triangles <F: Field> {
     f_xy: SparsePolynomial<F, SparseTerm>,
     f_yz: SparsePolynomial<F, SparseTerm>,
     f_xz: SparsePolynomial<F, SparseTerm>,
-    eval_type: PolynomialEvalType
+    eval_type: MLEAlgorithm
 }
 
 pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
@@ -81,7 +81,7 @@ pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
 }
 
 impl <F: Field> Triangles <F> {
-    pub fn new(matrix: Matrix<F>, eval_type: PolynomialEvalType) -> Self {
+    pub fn new(matrix: Matrix<F>, eval_type: MLEAlgorithm) -> Self {
         let a: Vec<F> = matrix.flatten();
         let var_num = matrix.var_num();
     
@@ -270,21 +270,21 @@ impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
         // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
         // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
         match self.eval_type {
-            PolynomialEvalType::SLOW_MLE => {
+            MLEAlgorithm::SlowMLE => {
                 let xy_eval = slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
                 let yz_eval = slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
                 let xz_eval = slow_mle(&self.matrix.flatten(), &point_xz);
         
                 xy_eval * yz_eval * xz_eval
             }
-            PolynomialEvalType::DYNAMIC_MLE => {
+            MLEAlgorithm::DynamicMLE => {
                 let xy_eval = dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
                 let yz_eval = dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
                 let xz_eval = dynamic_mle(&self.matrix.flatten(), &point_xz);
         
                 xy_eval * yz_eval * xz_eval
             },
-            PolynomialEvalType::STREAM_MLE => {
+            MLEAlgorithm::StreamMLE => {
                 let xy_eval = stream_mle(&self.matrix.flatten(), &point_xy.to_vec());
                 let yz_eval = stream_mle(&self.matrix.flatten(), &point_yz.to_vec());
                 let xz_eval = stream_mle(&self.matrix.flatten(), &point_xz);
