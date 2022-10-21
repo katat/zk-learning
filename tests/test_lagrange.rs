@@ -20,19 +20,6 @@ lazy_static! {
 	static ref R_5_CHI: Vec<TestField> = convert_field(&[0, 0, 0, 0, 2, 7, 6, 6]);
 	static ref R_6: Vec<TestField> = convert_field(&[5, 5, 5]);
 	static ref R_6_CHI: Vec<TestField> = convert_field(&[66, 80, 80, 100, 80, 100, 100, 125]);
-
-	static ref F_W: Vec<TestField> = convert_field(&[
-		0, 0, 0, 0,
-		0, 1, 1, 0,
-		0, 1, 0, 0,
-		0, 0, 0, 0
-	]);
-	static ref F_W_1: Vec<TestField> = convert_field(&[
-		0, 1, 1, 0,
-		1, 0, 1, 1,
-		1, 1, 0, 1,
-		0, 1, 1, 0
-	]);
 }
 
 #[rstest]

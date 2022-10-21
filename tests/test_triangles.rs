@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use rstest::rstest;
-use thaler::{small_fields::F251, triangles::Triangles};
+use thaler::{small_fields::F251, triangles::{Triangles, Matrix, PolynomialEvalType}};
 
 fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
     let len = (m.len() as f64).sqrt() as usize;
@@ -37,7 +37,8 @@ fn naive_count_test(
 	#[case] m: &[Vec<F251>],
 	#[case] expected: F251,
 ) {
-    let triangles = Triangles::new(m.to_vec());
+    let matrix = Matrix::new(m.to_vec());
+    let triangles = matrix.derive_mle(PolynomialEvalType::DYNAMIC_MLE);
 	assert_eq!(triangles.count(), expected);
 }
 
@@ -47,7 +48,8 @@ fn slow_mle_count_test(
 	#[case] m: &[Vec<F251>],
 	#[case] expected: F251,
 ) {
-    let triangles = Triangles::new(m.to_vec());
+    let matrix = Matrix::new(m.to_vec());
+    let triangles = matrix.derive_mle(PolynomialEvalType::DYNAMIC_MLE);
 	assert_eq!(triangles.count_by_mle(), expected);
 }
 

@@ -138,7 +138,7 @@ pub fn chi_w<F: Field>(w: &Vec<bool>, r: &Vec<F>) -> F {
 
 // Calculating the slow way, for benchmarking
 pub fn slow_mle<F: Field>(fw: &Vec<F>, r: &Vec<F>) -> F {
-	assert_eq!(r.len() as f64, (fw.len() as f64).sqrt());
+	assert_eq!(r.len() as f64, (fw.len() as f64).log2());
 	let sum: F = fw
 		.iter()
 		.enumerate()

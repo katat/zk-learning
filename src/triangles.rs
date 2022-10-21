@@ -3,11 +3,47 @@ use std::{iter};
 use ark_ff::{Field};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}};
 
-use crate::{lagrange::{poly_slow_mle, naive_mul, dynamic_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{lagrange::{poly_slow_mle, naive_mul, dynamic_mle, slow_mle, stream_mle}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct Matrix <F: Field>  {
     vec: Vec<Vec<F>>
+}
+
+//refactor this to be the base of the triangle poly
+//matrix holds the evaluation, then its generate func to derive triangle mle
+impl <F: Field> Matrix<F> {
+    pub fn new(m: Vec<Vec<F>>) -> Self {
+        Matrix {
+            vec: m
+        }
+    }
+    pub fn flatten(&self) -> Vec<F>{
+        self.vec.iter().flatten().cloned().collect()
+    }
+
+    pub fn size(&self) -> usize{
+        (self.flatten().len() as f32).sqrt() as usize
+    }
+
+    pub fn var_num(&self) -> usize {
+        (self.size() as f32).log2() as usize
+    }
+
+    pub fn get(&self, x: usize, y: usize) -> F {
+        self.vec[x][y]
+    }
+
+    pub fn derive_mle(&self, mode: PolynomialEvalType) -> Triangles<F> {
+        Triangles::new(self.clone(), mode)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum PolynomialEvalType {
+    SLOW_MLE,
+    DYNAMIC_MLE,
+    STREAM_MLE,
 }
 
 #[derive(Debug, Clone)]
@@ -16,6 +52,7 @@ pub struct Triangles <F: Field> {
     f_xy: SparsePolynomial<F, SparseTerm>,
     f_yz: SparsePolynomial<F, SparseTerm>,
     f_xz: SparsePolynomial<F, SparseTerm>,
+    eval_type: PolynomialEvalType
 }
 
 pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
@@ -43,34 +80,10 @@ pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
     x
 }
 
-impl <F: Field> Matrix<F> {
-    pub fn new(m: Vec<Vec<F>>) -> Self {
-        Matrix {
-            vec: m
-        }
-    }
-    pub fn flatten(&self) -> Vec<F>{
-        self.vec.iter().flatten().cloned().collect()
-    }
-
-    pub fn size(&self) -> usize{
-        (self.flatten().len() as f32).sqrt() as usize
-    }
-
-    pub fn var_num(&self) -> usize {
-        (self.size() as f32).log2() as usize
-    }
-
-    pub fn get(&self, x: usize, y: usize) -> F {
-        self.vec[x][y]
-    }
-}
-
 impl <F: Field> Triangles <F> {
-    pub fn new(matrix: Vec<Vec<F>>) -> Self {
-        let _matrix = Matrix { vec: matrix };
-        let a: Vec<F> = _matrix.flatten();
-        let var_num = _matrix.var_num();
+    pub fn new(matrix: Matrix<F>, eval_type: PolynomialEvalType) -> Self {
+        let a: Vec<F> = matrix.flatten();
+        let var_num = matrix.var_num();
     
         let x_start_index = 0;
         let y_start_index = var_num;
@@ -95,10 +108,11 @@ impl <F: Field> Triangles <F> {
         let poly_exist_xz = poly_slow_mle(&a, &xz_indexes);
 
         Triangles {
-            matrix: _matrix,
+            matrix,
             f_xy: poly_exist_xy,
             f_yz: poly_exist_yz,
             f_xz: poly_exist_xz,
+            eval_type,
         }
     }
 
@@ -249,25 +263,35 @@ impl <F: Field> SumCheckPolynomial<F> for Triangles<F> {
         let point_yz = &point[y_start_index..(z_start_index + self.matrix.var_num())];
         let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
 
-        // println!("point {:?}", point);
-        // println!("xy point {:?} {}", point_xy, self.f_xy.num_vars);
-        // println!("f xy terms {}", self.f_xy.terms.len());
-        // println!("point len {}", point.len());
-        // let xy_evaluation = ark_poly::Polynomial::evaluate(&self.f_xy, point);
-        // let yz_evaluation = ark_poly::Polynomial::evaluate(&self.f_yz, point);
-        // let xz_evaluation = ark_poly::Polynomial::evaluate(&self.f_xz, point);
-
         // let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
         // let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
         // let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
         // let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
         // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
         // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
-        let xy_eval = dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
-        let yz_eval = dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
-        let xz_eval = dynamic_mle(&self.matrix.flatten(), &point_xz);
-
-        xy_eval * yz_eval * xz_eval
+        match self.eval_type {
+            PolynomialEvalType::SLOW_MLE => {
+                let xy_eval = slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
+                let yz_eval = slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
+                let xz_eval = slow_mle(&self.matrix.flatten(), &point_xz);
+        
+                xy_eval * yz_eval * xz_eval
+            }
+            PolynomialEvalType::DYNAMIC_MLE => {
+                let xy_eval = dynamic_mle(&self.matrix.flatten(), &point_xy.to_vec());
+                let yz_eval = dynamic_mle(&self.matrix.flatten(), &point_yz.to_vec());
+                let xz_eval = dynamic_mle(&self.matrix.flatten(), &point_xz);
+        
+                xy_eval * yz_eval * xz_eval
+            },
+            PolynomialEvalType::STREAM_MLE => {
+                let xy_eval = stream_mle(&self.matrix.flatten(), &point_xy.to_vec());
+                let yz_eval = stream_mle(&self.matrix.flatten(), &point_yz.to_vec());
+                let xz_eval = stream_mle(&self.matrix.flatten(), &point_xz);
+        
+                xy_eval * yz_eval * xz_eval
+            },
+        }
         // ark_poly::Polynomial::evaluate(&xy_eval, &vec![]) * 
         // ark_poly::Polynomial::evaluate(&yz_eval, &vec![]) * 
         // ark_poly::Polynomial::evaluate(&xz_eval, &vec![]) 

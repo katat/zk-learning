@@ -6,7 +6,7 @@ use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use rstest::rstest;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, MultiPoly};
-use thaler::triangles::Triangles;
+use thaler::triangles::{Triangles, Matrix, PolynomialEvalType};
 
 lazy_static! {
 	static ref G_0: MultiPoly = SparsePolynomial::from_coefficients_vec(
@@ -30,8 +30,8 @@ lazy_static! {
 	);
 	static ref G_1_SUM: F251 = sumcheck::Prover::<MultiPoly>::new(&G_1).slow_sum_g();
 
-	static ref M: Vec<Vec<F251>> = thaler::utils::gen_matrix(4);
-	static ref G_2: Triangles<F251> = Triangles::new(M.to_vec());
+	static ref M: Matrix<F251> = Matrix::new(thaler::utils::gen_matrix(4));
+	static ref G_2: Triangles<F251> = M.derive_mle(PolynomialEvalType::DYNAMIC_MLE);
 	static ref G_2_SUM: F251 = sumcheck::Prover::<Triangles<F251>>::new(&G_2).slow_sum_g();
 
 }
