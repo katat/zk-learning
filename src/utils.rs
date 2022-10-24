@@ -23,3 +23,11 @@ pub fn gen_matrix (len: usize) -> Vec<Vec<F251>> {
 pub fn convert_field<F: Field>(vec: &[u32]) -> Vec<F> {
 	vec.iter().map(|e| F::from(*e)).collect()
 }
+
+// Converts i into an index in {0,1}^v, used to retrieves f evaluations
+pub fn n_to_vec(i: usize, n: usize) -> Vec<bool> {
+	let x = format!("{:0>width$}", format!("{:b}", i), width = n);
+	let x: Vec<bool> = x.chars().map(|x| x == '1')
+		.collect();
+	x
+}

@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use rstest::rstest;
-use thaler::{lagrange::{self}, utils::convert_field};
+use thaler::{lagrange::{self}, utils::{convert_field, n_to_vec}};
 use thaler::small_fields::{F5};
 
 type TestField = F5;
@@ -32,7 +32,38 @@ fn slow_lagrange_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	assert_eq!(lagrange::slow_mle(fw, r), expected);
+	let mle = lagrange::MultilinearExtension::new(fw.clone());
+	assert_eq!(mle.slow_eval(r), expected);
+}
+
+#[rstest]
+fn t() {
+	let evals = convert_field(&[2, 4, 3, 2]);
+	let mle = lagrange::MultilinearExtension::new(evals);
+	let result: TestField = mle.slow_eval(&convert_field(&[0, 0]));
+	assert_eq!(result, TestField::from(2));
+	let result: TestField = mle.slow_eval(&convert_field(&[0, 1]));
+	assert_eq!(result, TestField::from(4));
+	
+	let result: TestField = mle.slow_eval(&convert_field(&[1, 0]));
+	assert_eq!(result, TestField::from(3));
+	let result: TestField = mle.slow_eval(&convert_field(&[1, 1]));
+	assert_eq!(result, TestField::from(2));
+
+
+	let mut sum: TestField = TestField::from(0);
+	for i in 0..4 {
+		let vars = n_to_vec(i, 2);
+		println!("{:?}", vars);
+		let eval = mle.slow_eval(&vars.iter().map(|e| TestField::from(*e)).collect());
+		println!("eval {:?}", eval);
+		sum += eval;
+	}
+
+	assert_eq!(sum, TestField::from(11));
+
+	// 2 * 4 * 3 * 2 = 48
+	// [6,8]
 }
 
 #[rstest]
@@ -45,7 +76,8 @@ fn stream_lagrange_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	assert_eq!(lagrange::stream_mle(fw, r), expected);
+	let mle = lagrange::MultilinearExtension::new(fw.clone());
+	assert_eq!(mle.stream_eval(r), expected);
 }
 
 #[rstest]
@@ -54,11 +86,12 @@ fn stream_lagrange_test(
 #[case(&F_2, &R_2, TestField::from(4))]
 #[case(&F_2, &R_3, TestField::from(0))]
 fn dynamic_mle_test(
-	#[case] fw: &[TestField],
+	#[case] fw: &Vec<TestField>,
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	assert_eq!(lagrange::dynamic_mle(fw, r), expected);
+	let mle = lagrange::MultilinearExtension::new(fw.clone());
+	assert_eq!(mle.dynamic_eval(r), expected);
 }
 
 #[rstest]
@@ -66,5 +99,5 @@ fn dynamic_mle_test(
 #[case(&R_5,&R_5_CHI)]
 #[case(&R_6, &R_6_CHI)]
 fn memoize_test(#[case] r: &Vec<TestField>, #[case] expected: &Vec<TestField>) {
-	assert_eq!(lagrange::memoize(r, r.len()), *expected);
+	assert_eq!(lagrange::MultilinearExtension::memoize(r, r.len()), *expected);
 }
