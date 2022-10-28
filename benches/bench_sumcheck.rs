@@ -4,11 +4,13 @@ use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
 use thaler::triangles::{TriangleMLE, MLEAlgorithm, TriangleGraph};
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
+type TestField = F251;
+
 // a gi lookup table
-fn build_gi_lookup(g: &TriangleMLE<F251>) -> Vec<sumcheck::UniPoly<F251>> {
-	let r: Option<F251> = Some(1u32.into());
+fn build_gi_lookup(g: &TriangleMLE<TestField>) -> Vec<sumcheck::UniPoly<TestField>> {
+	let r: Option<TestField> = Some(1u32.into());
 	let mut lookup= vec![];
-	let mut p: Prover<TriangleMLE<F251>> = sumcheck::Prover::<TriangleMLE<F251>>::new(g);
+	let mut p: Prover<TestField, TriangleMLE<TestField>> = sumcheck::Prover::<TestField, TriangleMLE<TestField>>::new(g);
 	// OVERHEAD
 	let mut gi = p.gen_uni_polynomial(None);
 	lookup.push(gi.clone());
@@ -42,13 +44,13 @@ fn bench_verifier_steps(c: &mut Criterion) {
 		);
 
 		for eval_type in eval_types {
-			let g: TriangleMLE<F251> = matrix.derive_mle(eval_type.clone());
-			let p: Prover<TriangleMLE<F251>> = sumcheck::Prover::new(&g.clone());
+			let g: TriangleMLE<TestField> = matrix.derive_mle(eval_type.clone());
+			let p: Prover<TestField, TriangleMLE<TestField>> = sumcheck::Prover::new(&g.clone());
 			let g_sum = p.slow_sum_g();
 			let lookup = build_gi_lookup(&g);
 		
-			let mut v: Verifier<UniPoly<F251>, TriangleMLE<F251>> = Verifier::new(g_sum, Rc::new(g.clone()));
-			v.random_func(|| F251::from(1));
+			let mut v: Verifier<TestField, UniPoly<TestField>, TriangleMLE<TestField>> = Verifier::new(g_sum, Rc::new(g.clone()));
+			v.random_func(|| TestField::from(1));
 
 			assert_eq!(num_vars, lookup.len());
 			
@@ -83,7 +85,7 @@ fn bench_prover_lookup_build(c: &mut Criterion) {
 	let matrix_sizes = [4, 8, 16, 32];
 	for size in matrix_sizes {
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
-		let g: TriangleMLE<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
+		let g: TriangleMLE<TestField> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("prover for size", size), 
 			|b| {

@@ -24,7 +24,7 @@ impl <F: Field> MultilinearExtension<F> {
 			0 => {
 				points.push(partial_point);
 			}
-			Default => {
+			_ => {
 				for var in fixed_vars {
 					for b in [F::zero(), F::one()] {
 						let mut point = partial_point.clone();

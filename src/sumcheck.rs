@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ark_ff::{Field, One};
+use ark_ff::{Field};
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
@@ -10,20 +10,20 @@ use rand::Rng;
 use crate::small_fields::F251;
 
 // refactor field to be generic
-pub type MultiPoly = SparsePolynomial<F251, SparseTerm>;
+pub type MultiPoly<F> = SparsePolynomial<F, SparseTerm>;
 pub type UniPoly<F> = UniSparsePolynomial<F>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Round {
 	Middle(usize),
 	Final(),
 }
 
 // Converts i into an index in {0,1}^v
-pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
+pub fn n_to_vec<F: Field>(i: usize, n: usize) -> Vec<F> {
 	format!("{:0>width$}", format!("{:b}", i), width = n)
 		.chars()
-		.map(|x| if x == '1' { 1.into() } else { 0.into() })
+		.map(|x| if x == '1' { F::one() } else { F::zero() })
 		.collect()
 }
 
@@ -34,7 +34,7 @@ pub trait SumCheckPolynomial<F> where F: Field {
     fn evaluate(&self, point: &Vec<F>) -> F;
 }
 
-impl <F: Field> SumCheckPolynomial<F> for SparsePolynomial<F, SparseTerm> {
+impl <F: Field> SumCheckPolynomial<F> for MultiPoly<F> {
     fn terms(&self) -> Vec<(F, SparseTerm)> {
 		self.terms.to_vec()
     }
@@ -54,25 +54,25 @@ impl <F: Field> SumCheckPolynomial<F> for SparsePolynomial<F, SparseTerm> {
 
 // Simulates memory of a single prover instance
 #[derive(Debug, Clone)]
-pub struct Prover<P: SumCheckPolynomial<F251>> {
+pub struct Prover<F, P> where F: Field, P: SumCheckPolynomial<F> {
 	pub g: P,
-	pub r_vec: Vec<F251>,
+	pub r_vec: Vec<F>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Verifier<P: Polynomial<F251>, G: SumCheckPolynomial<F251>> {
-	pub c_1: F251,
+pub struct Verifier<F: Field, P: Polynomial<F>, G: SumCheckPolynomial<F>> {
+	pub c_1: F,
 	pub g: Rc<G>,
 	pub rounds: usize,
 	pub prev_g_i: Option<P>,
-	pub r_vec: Vec<F251>,
+	pub r_vec: Vec<F>,
 	pub current_round: Option<Round>,
 	//todo this is not closure, find a better way to achieve closure.
-	pub random_func: Option<fn() -> F251>
+	pub random_func: Option<fn() -> F>
 }
 
-impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P, G>  {
-	pub fn new(c_1: F251, g: Rc<G>) -> Self {
+impl <F: Field, P: Polynomial<F, Point = F>, G: SumCheckPolynomial<F>> Verifier<F, P, G> {
+	pub fn new(c_1: F, g: Rc<G>) -> Self {
 		let rounds = g.num_vars();
 		Verifier {
 			c_1,
@@ -85,13 +85,13 @@ impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P
 		}
 	}
 
-	pub fn random_func(&mut self, f: fn() -> F251) {
+	pub fn random_func(&mut self, f: fn() -> F) {
 		self.random_func = Some(f);
 	}
 
-	fn generate_random(&mut self) -> F251 {
+	fn generate_random(&mut self) -> F {
 		let mut rng = rand::thread_rng();
-		let mut r = rng.gen();
+		let mut r = F::from(rng.gen::<u32>());
 
 		if self.random_func != None {
 			r = self.random_func.unwrap()();
@@ -147,7 +147,7 @@ impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P
 	}
 }
 
-impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
+impl <F: Field, P: SumCheckPolynomial<F>> Prover<F, P> where P: Clone {
 	pub fn new(g: &P) -> Self {
 		Prover {
 			g: g.clone(),
@@ -156,7 +156,7 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 	}
 
 	// Given polynomial g, fix Xj, evaluate over xj+1
-	pub fn gen_uni_polynomial(&mut self, r: Option<F251>) -> UniPoly<F251> {
+	pub fn gen_uni_polynomial(&mut self, r: Option<F>) -> UniPoly<F> {
 		if r.is_some() {
 			self.r_vec.push(r.unwrap());
 		}
@@ -172,7 +172,7 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 		)
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
-	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly<F251> {
+	pub fn evaluate_gj(&self, points: Vec<F>) -> UniPoly<F> {
 		self.g.var_fixed_evaluate(self.r_vec.len(), [self.r_vec.to_vec(), points].concat())
 	}
 
@@ -180,10 +180,10 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 	pub fn evaluate_term(
 		&self,
 		term: &SparseTerm,
-		point: &Vec<F251>,
-	) -> (F251, Option<SparseTerm>) {
+		point: &Vec<F>,
+	) -> (F, Option<SparseTerm>) {
 		let mut fixed_term: Option<SparseTerm> = None;
-		let coeff: F251 =
+		let coeff: F =
 			cfg_into_iter!(term).fold(1u32.into(), |product, (var, power)| match *var {
 				j if j == self.r_vec.len() => {
 					fixed_term = Some(SparseTerm::new(vec![(j, *power)]));
@@ -196,7 +196,7 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 	}
 
 	// Sum all evaluations of polynomial `g` over boolean hypercube
-	pub fn slow_sum_g(&self) -> F251 {
+	pub fn slow_sum_g(&self) -> F {
 		let v = self.g.num_vars();
 		let n = 2u32.pow(v as u32);
 		(0..n)
@@ -218,11 +218,10 @@ pub fn max_degrees<P: SumCheckPolynomial<F251>>(g: &P) -> Vec<usize> {
 	lookup
 }
 
-pub fn verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Clone{
+pub fn verify<F: Field, P: SumCheckPolynomial<F>>(g: &P, c_1: F) -> bool where P: Clone{
 	let mut p = Prover::new(g);
 
-	let mut v: Verifier<UniPoly<F251>, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
-	// v.random_func(|| F251::from(2));
+	let mut v: Verifier<F, UniPoly<F>, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
 	while v.current_round != Some(Round::Final()) {
 		let r = v.r_vec.last();
 		let gi = match r {
@@ -237,8 +236,3 @@ pub fn verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Cl
 	true
 }
 
-pub fn slow_verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Copy{
-	let p = Prover::new(g);
-	let manual_sum = p.slow_sum_g();
-	manual_sum == c_1
-}
