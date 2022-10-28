@@ -2,7 +2,7 @@
 extern crate lazy_static;
 
 use rstest::rstest;
-use thaler::{small_fields::F251, triangles::{TriangleGraph, MLEAlgorithm, TriangleMLE}, utils::convert_field};
+use thaler::{small_fields::F251, triangles::{TriangleGraph, TriangleMLE}, utils::convert_field, lagrange::MLEAlgorithm};
 use thaler::sumcheck::SumCheckPolynomial;
 
 type TestField = F251;
@@ -51,7 +51,7 @@ fn var_fixed_evaluate_test() {
         1, 0, 
     ]);
     let matrix = TriangleGraph::new(m.to_vec());
-    let triangle: TriangleMLE<TestField> = matrix.derive_mle(MLEAlgorithm::SlowMLE);
+    let triangle: TriangleMLE<TestField> = matrix.derive_mle(MLEAlgorithm::Slow);
     let point = convert_field(&[/*x*/0,/*y*/0,/*z*/1]);
     let p = triangle.var_fixed_evaluate(0, point);
     println!("poly {:?}", p);

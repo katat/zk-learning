@@ -4,7 +4,7 @@ extern crate lazy_static;
 use ark_ff::{Zero, One};
 use ark_poly::polynomial::Polynomial;
 use rstest::rstest;
-use thaler::{lagrange::{self}, utils::{convert_field, n_to_vec}, sumcheck::UniPoly};
+use thaler::{lagrange::{self, MLEAlgorithm}, utils::{convert_field, n_to_vec}, sumcheck::UniPoly};
 use thaler::small_fields::{F5};
 
 type TestField = F5;
@@ -34,22 +34,22 @@ fn slow_lagrange_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	let mle = lagrange::MultilinearExtension::new(fw.clone());
-	assert_eq!(mle.slow_eval(r), expected);
+	let mle = lagrange::MultilinearExtension::new(fw.clone(), MLEAlgorithm::Slow);
+	assert_eq!(mle.evaluate(r), expected);
 }
 
 #[rstest]
 fn t() {
 	let evals = convert_field(&[2, 4, 3, 2]);
-	let mle = lagrange::MultilinearExtension::new(evals);
-	let result: TestField = mle.slow_eval(&convert_field(&[0, 0]));
+	let mle = lagrange::MultilinearExtension::new(evals, MLEAlgorithm::Slow);
+	let result: TestField = mle.evaluate(&convert_field(&[0, 0]));
 	assert_eq!(result, TestField::from(2));
-	let result: TestField = mle.slow_eval(&convert_field(&[0, 1]));
+	let result: TestField = mle.evaluate(&convert_field(&[0, 1]));
 	assert_eq!(result, TestField::from(4));
 	
-	let result: TestField = mle.slow_eval(&convert_field(&[1, 0]));
+	let result: TestField = mle.evaluate(&convert_field(&[1, 0]));
 	assert_eq!(result, TestField::from(3));
-	let result: TestField = mle.slow_eval(&convert_field(&[1, 1]));
+	let result: TestField = mle.evaluate(&convert_field(&[1, 1]));
 	assert_eq!(result, TestField::from(2));
 
 
@@ -57,7 +57,7 @@ fn t() {
 	for i in 0..4 {
 		let vars = n_to_vec(i, 2);
 		println!("{:?}", vars);
-		let eval = mle.slow_eval(&vars.iter().map(|e| TestField::from(*e)).collect());
+		let eval = mle.evaluate(&vars.iter().map(|e| TestField::from(*e)).collect());
 		println!("eval {:?}", eval);
 		sum += eval;
 	}
@@ -73,17 +73,17 @@ fn test_fix_vars() {
 	let evals: Vec<TestField> = convert_field(&[2, 4, 3, 2]);
 
 	// full point
-	let mut mle0 = lagrange::MultilinearExtension::new(evals.clone());
+	let mut mle0 = lagrange::MultilinearExtension::new(evals.clone(), MLEAlgorithm::Slow);
 	mle0.fix_vars(&[], convert_field(&[0, 1]));
 	assert_eq!(mle0.to_evals(), convert_field(&[4]));
 
 	// x1
-	let mut mle1 = lagrange::MultilinearExtension::new(evals.clone());
+	let mut mle1 = lagrange::MultilinearExtension::new(evals.clone(), MLEAlgorithm::Slow);
 	mle1.fix_vars(&[0], [TestField::one()].to_vec());
 	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
 
 	// x1 replace full point
-	let mut mle1 = lagrange::MultilinearExtension::new(evals.clone());
+	let mut mle1 = lagrange::MultilinearExtension::new(evals.clone(), MLEAlgorithm::Slow);
 	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
 	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
 
@@ -97,17 +97,17 @@ fn test_fix_vars() {
 	assert_eq!(uni.evaluate(&TestField::one()), mle0.to_evals()[0]);
 
 	// x0
-	let mut mle2 = lagrange::MultilinearExtension::new(evals.clone());
+	let mut mle2 = lagrange::MultilinearExtension::new(evals.clone(), MLEAlgorithm::Slow);
 	mle2.fix_vars(&[0], [TestField::zero()].to_vec());
 	assert_eq!(mle2.to_evals(), convert_field(&[2, 3]));
 
 	// 2 * 4 * 3 * 2
 	let mle3 = mle1.clone().mul(mle2.clone());
-	let result = mle3.slow_eval(&convert_field(&[0])) * mle3.slow_eval(&convert_field(&[1]));
+	let result = mle3.evaluate(&convert_field(&[0])) * mle3.evaluate(&convert_field(&[1]));
 	assert_eq!(result, evals[0] * evals[1] * evals[2] * evals[3]);
 
 	let mle3 = mle1.clone().add(mle2.clone());
-	let result = mle3.slow_eval(&convert_field(&[0])) + mle3.slow_eval(&convert_field(&[1]));
+	let result = mle3.evaluate(&convert_field(&[0])) + mle3.evaluate(&convert_field(&[1]));
 	assert_eq!(result, evals[0] + evals[1] + evals[2] + evals[3]);
 
 	// support 
@@ -123,7 +123,7 @@ fn stream_lagrange_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	let mle = lagrange::MultilinearExtension::new(fw.clone());
+	let mle = lagrange::MultilinearExtension::new(fw.clone(), MLEAlgorithm::Stream);
 	assert_eq!(mle.stream_eval(r), expected);
 }
 
@@ -137,7 +137,7 @@ fn dynamic_mle_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	let mle = lagrange::MultilinearExtension::new(fw.clone());
+	let mle = lagrange::MultilinearExtension::new(fw.clone(), MLEAlgorithm::Dynamic);
 	assert_eq!(mle.dynamic_eval(r), expected);
 }
 

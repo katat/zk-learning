@@ -4,15 +4,24 @@ use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, DenseMVPolyno
 use crate::{utils::n_to_vec, sumcheck::UniPoly};
 
 #[derive(Debug, Clone)]
+pub enum MLEAlgorithm {
+    Slow,
+    Dynamic,
+    Stream,
+}
+
+#[derive(Debug, Clone)]
 pub struct MultilinearExtension<F: Field> {
-	evals: Vec<F>
+	evals: Vec<F>,
+	algo: MLEAlgorithm,
 }
 
 impl <F: Field> MultilinearExtension<F> {
 	// todo accept mle algo enum 
-	pub fn new(evals: Vec<F>) -> Self {
+	pub fn new(evals: Vec<F>, algo: MLEAlgorithm) -> Self {
 		MultilinearExtension {
-			evals
+			evals,
+			algo,
 		}
 	}
 
@@ -35,7 +44,7 @@ impl <F: Field> MultilinearExtension<F> {
 						}
 						else {
 							point.splice(loc..loc+1, vec![b].iter().cloned());
-						}
+						}		
 						points.push(point);
 					}
 				};
@@ -45,12 +54,20 @@ impl <F: Field> MultilinearExtension<F> {
 		// println!("points {:?}", points);
 
 		for point in points {
-			evals.push(self.dynamic_eval(&point));
+			evals.push(self.evaluate(&point));
 		}
 
 		// println!("evals {:?}", evals);
 
 		self.evals = evals;
+	}
+
+	pub fn evaluate(&self, point: &Vec<F>) -> F {
+		match self.algo {
+			MLEAlgorithm::Dynamic => self.dynamic_eval(point),
+			MLEAlgorithm::Slow => self.slow_eval(point),
+			MLEAlgorithm::Stream => self.stream_eval(point),
+		}
 	}
 
 	pub fn to_evals(&self) -> Vec<F> {
@@ -101,7 +118,8 @@ impl <F: Field> MultilinearExtension<F> {
 		}).collect();
 
 		Self {
-			evals: added_evals
+			evals: added_evals,
+			algo: self.algo.clone(),
 		}
 	}
 
@@ -114,7 +132,8 @@ impl <F: Field> MultilinearExtension<F> {
 		}).collect();
 
 		Self {
-			evals: multiplicated_evals
+			evals: multiplicated_evals,
+			algo: self.algo.clone(),
 		}
 	}
 

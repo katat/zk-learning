@@ -4,9 +4,10 @@ extern crate lazy_static;
 use ark_poly::DenseMVPolynomial;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use rstest::rstest;
+use thaler::lagrange::MLEAlgorithm;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, MultiPoly};
-use thaler::triangles::{TriangleMLE, TriangleGraph, MLEAlgorithm};
+use thaler::triangles::{TriangleMLE, TriangleGraph};
 
 type TestField = F251;
 type SumCheckPoly = MultiPoly<TestField>;
@@ -52,7 +53,7 @@ lazy_static! {
 	static ref G_1_SUM: TestField = sumcheck::Prover::<TestField, SumCheckPoly>::new(&G_1).slow_sum_g();
 
 	static ref M: TriangleGraph<TestField> = TriangleGraph::new(thaler::utils::gen_matrix(4));
-	static ref G_2: TriangleMLE<TestField> = M.derive_mle(MLEAlgorithm::DynamicMLE);
+	static ref G_2: TriangleMLE<TestField> = M.derive_mle(MLEAlgorithm::Dynamic);
 	static ref G_2_SUM: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField>>::new(&G_2).slow_sum_g();
 
 }
@@ -74,7 +75,7 @@ fn sumcheck_triangles_test(#[case] p: &TriangleMLE<TestField>, #[case] c: &TestF
 fn sumcheck_triangles_2_test() {
 	let m = convert_vec(&[0, 1, 1, 0]);
     let matrix = TriangleGraph::new(m.to_vec());
-	let g = matrix.derive_mle(MLEAlgorithm::SlowMLE);
+	let g = matrix.derive_mle(MLEAlgorithm::Slow);
 	let sum: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField>>::new(&g).slow_sum_g();
 
 	assert!(sumcheck::verify::<TestField, TriangleMLE<TestField>>(&g, sum));

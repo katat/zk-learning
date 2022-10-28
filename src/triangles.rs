@@ -3,7 +3,7 @@ use std::{iter};
 use ark_ff::{Field};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}};
 
-use crate::{lagrange::MultilinearExtension, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{lagrange::{MultilinearExtension, MLEAlgorithm}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct TriangleGraph <F: Field>  {
@@ -69,13 +69,6 @@ impl <F: Field> TriangleGraph<F> {
 }
 
 #[derive(Debug, Clone)]
-pub enum MLEAlgorithm {
-    SlowMLE,
-    DynamicMLE,
-    StreamMLE,
-}
-
-#[derive(Debug, Clone)]
 pub struct TriangleMLE <F: Field> {
 	pub matrix: TriangleGraph<F>,
     f_xy: SparsePolynomial<F, SparseTerm>,
@@ -131,8 +124,9 @@ impl <F: Field> TriangleMLE <F> {
         let mut xz_indexes: Vec<usize> = x_indexes;
         xz_indexes.append(&mut z_indexes);
 
-        let mle = MultilinearExtension::new(a);
+        let mle = MultilinearExtension::new(a, eval_type.clone());
         //optimize these polynomial representations
+        // todo refactor these into mle eval type
         let poly_exist_xy = mle.poly_slow_mle(&xy_indexes);
         let poly_exist_yz = mle.poly_slow_mle(&yz_indexes);
         let poly_exist_xz = mle.poly_slow_mle(&xz_indexes);
@@ -182,9 +176,9 @@ impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
         // println!("yz point {:?}", point_yz);
         // println!("xz point {:?}", point_xz);
 
-        let mut xy_mle = MultilinearExtension::new(self.matrix.flatten());
-        let mut yz_mle = MultilinearExtension::new(self.matrix.flatten());
-        let mut xz_mle = MultilinearExtension::new(self.matrix.flatten());
+        let mut xy_mle = MultilinearExtension::new(self.matrix.flatten(), MLEAlgorithm::Dynamic);
+        let mut yz_mle = MultilinearExtension::new(self.matrix.flatten(), MLEAlgorithm::Dynamic);
+        let mut xz_mle = MultilinearExtension::new(self.matrix.flatten(), MLEAlgorithm::Dynamic);
 
         let mut xy_var= vec![];
         let mut yz_var= vec![];
@@ -270,29 +264,35 @@ impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
         // let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
         // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
         // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
-        let mle = MultilinearExtension::new(self.matrix.flatten());
-        match self.eval_type {
-            MLEAlgorithm::SlowMLE => {
-                let xy_eval = mle.slow_eval(&point_xy.to_vec());
-                let yz_eval = mle.slow_eval(&point_yz.to_vec());
-                let xz_eval = mle.slow_eval(&point_xz);
+        let mle = MultilinearExtension::new(self.matrix.flatten(), self.eval_type.clone());
+        let xy_eval = mle.evaluate(&point_xy.to_vec());
+        let yz_eval = mle.evaluate(&point_yz.to_vec());
+        let xz_eval = mle.evaluate(&point_xz);
+
+        xy_eval * yz_eval * xz_eval
+
+        // match self.eval_type {
+        //     MLEAlgorithm::SlowMLE => {
+        //         let xy_eval = mle.slow_eval(&point_xy.to_vec());
+        //         let yz_eval = mle.slow_eval(&point_yz.to_vec());
+        //         let xz_eval = mle.slow_eval(&point_xz);
         
-                xy_eval * yz_eval * xz_eval
-            }
-            MLEAlgorithm::DynamicMLE => {
-                let xy_eval = mle.dynamic_eval(&point_xy.to_vec());
-                let yz_eval = mle.dynamic_eval(&point_yz.to_vec());
-                let xz_eval = mle.dynamic_eval(&point_xz);
+        //         xy_eval * yz_eval * xz_eval
+        //     }
+        //     MLEAlgorithm::DynamicMLE => {
+        //         let xy_eval = mle.dynamic_eval(&point_xy.to_vec());
+        //         let yz_eval = mle.dynamic_eval(&point_yz.to_vec());
+        //         let xz_eval = mle.dynamic_eval(&point_xz);
         
-                xy_eval * yz_eval * xz_eval
-            }
-            MLEAlgorithm::StreamMLE => {
-                let xy_eval = mle.stream_eval(&point_xy.to_vec());
-                let yz_eval = mle.stream_eval(&point_yz.to_vec());
-                let xz_eval = mle.stream_eval(&point_xz);
+        //         xy_eval * yz_eval * xz_eval
+        //     }
+        //     MLEAlgorithm::StreamMLE => {
+        //         let xy_eval = mle.stream_eval(&point_xy.to_vec());
+        //         let yz_eval = mle.stream_eval(&point_yz.to_vec());
+        //         let xz_eval = mle.stream_eval(&point_xz);
         
-                xy_eval * yz_eval * xz_eval
-            },
-        }
+        //         xy_eval * yz_eval * xz_eval
+        //     },
+        // }
     }
 }

@@ -1,7 +1,8 @@
 use std::rc::Rc;
+use thaler::lagrange::MLEAlgorithm;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
-use thaler::triangles::{TriangleMLE, MLEAlgorithm, TriangleGraph};
+use thaler::triangles::{TriangleMLE, TriangleGraph};
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
 type TestField = F251;
@@ -26,9 +27,9 @@ fn bench_verifier_steps(c: &mut Criterion) {
 
 	let matrix_sizes = [4, 8, 16, 32];
 	let eval_types = &[
-		MLEAlgorithm::SlowMLE,
-		MLEAlgorithm::DynamicMLE,
-		MLEAlgorithm::StreamMLE,
+		MLEAlgorithm::Slow,
+		MLEAlgorithm::Dynamic,
+		MLEAlgorithm::Stream,
 	];
 	for size in matrix_sizes {
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
@@ -85,7 +86,7 @@ fn bench_prover_lookup_build(c: &mut Criterion) {
 	let matrix_sizes = [4, 8, 16, 32];
 	for size in matrix_sizes {
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
-		let g: TriangleMLE<TestField> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);
+		let g: TriangleMLE<TestField> = matrix.derive_mle(MLEAlgorithm::Dynamic);
 		group.bench_function(
 			BenchmarkId::new::<&str, usize>("prover for size", size), 
 			|b| {
