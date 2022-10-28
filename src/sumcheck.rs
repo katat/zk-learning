@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ark_ff::{Field};
+use ark_ff::{Field, One};
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
@@ -9,8 +9,9 @@ use rand::Rng;
 
 use crate::small_fields::F251;
 
+// refactor field to be generic
 pub type MultiPoly = SparsePolynomial<F251, SparseTerm>;
-pub type UniPoly = UniSparsePolynomial<F251>;
+pub type UniPoly<F> = UniSparsePolynomial<F>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Round {
@@ -26,9 +27,9 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<F251> {
 		.collect()
 }
 
-pub trait SumCheckPolynomial<F> {
+pub trait SumCheckPolynomial<F> where F: Field {
     fn terms(&self) -> Vec<(F, SparseTerm)>;
-	fn var_fixed_evaluate<C>(&self, cb: C) -> UniPoly where C: FnMut((F, SparseTerm)) -> UniPoly;
+	fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F>;
     fn num_vars(&self) -> usize;
     fn evaluate(&self, point: &Vec<F>) -> F;
 }
@@ -38,15 +39,8 @@ impl <F: Field> SumCheckPolynomial<F> for SparsePolynomial<F, SparseTerm> {
 		self.terms.to_vec()
     }
 
-    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F, SparseTerm)) -> UniPoly {
-        self.terms().clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		)
-
+    fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
+        todo!();
     }
 
     fn num_vars(&self) -> usize {
@@ -121,16 +115,20 @@ impl <P: Polynomial<F251, Point = F251>, G: SumCheckPolynomial<F251>> Verifier<P
 
 	pub fn verify(&mut self, g_i: Option<P>) {
 
+		// println!("g_i {:?}", g_i);
+
 		match &self.current_round {
 			None => {
 				let g_i = g_i.unwrap();
 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
 				assert_eq!(self.c_1, new_c);
+				// println!("g_1");
 				self.prev_g_i = Some(g_i);
 			},
 			Some(Round::Middle(_)) => {
 				let g_i = g_i.unwrap();
 				let last_r = self.r_vec.last().unwrap();
+				// println!("last r {}", last_r);
 				let expected_c = self.prev_g_i.as_ref().unwrap().evaluate(last_r);
 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
 				assert_eq!(expected_c, new_c);
@@ -158,7 +156,7 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 	}
 
 	// Given polynomial g, fix Xj, evaluate over xj+1
-	pub fn gen_uni_polynomial(&mut self, r: Option<F251>) -> UniPoly {
+	pub fn gen_uni_polynomial(&mut self, r: Option<F251>) -> UniPoly<F251> {
 		if r.is_some() {
 			self.r_vec.push(r.unwrap());
 		}
@@ -166,23 +164,16 @@ impl <P: SumCheckPolynomial<F251>> Prover<P> where P: Clone {
 		(0..(2u32.pow(v as u32 - 1))).fold(
 			UniPoly::from_coefficients_vec(vec![(0, 0u32.into())]),
 			|sum, n| {
-				let gj = self.evaluate_gj(n_to_vec(n as usize, v));
+				let point = n_to_vec(n as usize, v);
+				let gj = self.evaluate_gj(point.clone());
+				// println!("\x1b[93m gj {:?}\x1b[0m", gj);
 				sum + gj
 			},
 		)
 	}
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
-	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly {
-		self.g.var_fixed_evaluate(|(coeff, term)| {
-			let (coeff_eval, fixed_term) = self.evaluate_term(&term, &points);
-			match fixed_term {
-				None => UniPoly::from_coefficients_vec(vec![(0, coeff * coeff_eval)]),
-				_ => UniPoly::from_coefficients_vec(vec![(
-					fixed_term.unwrap().degree(),
-					coeff * coeff_eval,
-				)]),
-			}
-		})
+	pub fn evaluate_gj(&self, points: Vec<F251>) -> UniPoly<F251> {
+		self.g.var_fixed_evaluate(self.r_vec.len(), [self.r_vec.to_vec(), points].concat())
 	}
 
 	// Evaluates a term with a fixed univar, returning (new coefficent, fixed term)
@@ -230,7 +221,8 @@ pub fn max_degrees<P: SumCheckPolynomial<F251>>(g: &P) -> Vec<usize> {
 pub fn verify<P: SumCheckPolynomial<F251>>(g: &P, c_1: F251) -> bool where P: Clone{
 	let mut p = Prover::new(g);
 
-	let mut v: Verifier<UniPoly, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
+	let mut v: Verifier<UniPoly<F251>, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
+	// v.random_func(|| F251::from(2));
 	while v.current_round != Some(Round::Final()) {
 		let r = v.r_vec.last();
 		let gi = match r {

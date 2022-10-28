@@ -167,30 +167,86 @@ impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
         mul(mul(self.f_xy.terms.clone(), self.f_yz.terms.clone()), self.f_xz.terms.clone())
     }
 
-    fn var_fixed_evaluate<C>(&self, mut cb: C) -> UniPoly where C: FnMut((F, SparseTerm)) -> UniPoly {
+    fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
+        // println!("\x1b[93mpoint {:?}\x1b[0m", point);
 
-        let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		);
-        let f_yz_unipoly: UniPoly = self.f_yz.terms.clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		);
-        let f_xz_unipoly: UniPoly = self.f_xz.terms.clone().into_iter().fold(
-			UniPoly::from_coefficients_vec(vec![]),
-			|sum, term| {
-				let curr = cb(term);
-				sum + curr
-			}
-		);
-        f_xy_unipoly.mul(&f_yz_unipoly).mul(&f_xz_unipoly)
+        let dim = self.matrix.one_dimension_size();
+        let y_start_index = dim;
+        let z_start_index = dim * 2;
+        // prepend r_vec
+        let point_xy = &point[0..(z_start_index)];
+        let point_yz = &point[y_start_index..(z_start_index + self.matrix.one_dimension_size())];
+        let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
+
+        // println!("xy point {:?}", point_xy);
+        // println!("yz point {:?}", point_yz);
+        // println!("xz point {:?}", point_xz);
+
+        let mut xy_mle = MultilinearExtension::new(self.matrix.flatten());
+        let mut yz_mle = MultilinearExtension::new(self.matrix.flatten());
+        let mut xz_mle = MultilinearExtension::new(self.matrix.flatten());
+
+        let mut xy_var= vec![];
+        let mut yz_var= vec![];
+        let mut xz_var= vec![];
+        if var < z_start_index {
+            xy_var.push(var);
+            if var < y_start_index {
+                xz_var.push(var);
+            }
+            else {
+                yz_var.push(var - dim);
+            }
+        }
+        else {
+            yz_var.push(var - dim);
+            xz_var.push(var - dim);
+        }
+
+        // println!("xy var {:?}", xy_var);
+        // println!("yz var {:?}", yz_var);
+        // println!("xz var {:?}", xz_var);
+
+        xy_mle.fix_vars(&xy_var, point_xy.to_vec());
+        yz_mle.fix_vars(&yz_var, point_yz.to_vec());
+        xz_mle.fix_vars(&xz_var, point_xz.to_vec());
+
+        // println!("xy mle fixed vars, evals {:?}", xy_mle.to_evals());
+        // println!("yz mle fixed vars, evals {:?}", yz_mle.to_evals());
+        // println!("xz mle fixed vars, evals {:?}", xz_mle.to_evals());
+
+        let xy_poly = xy_mle.interpolate();
+        let yz_poly = yz_mle.interpolate();
+        let xz_poly = xz_mle.interpolate();
+
+        // println!("xy poly {:?}", xy_poly);
+        // println!("yz poly {:?}", yz_poly);
+        // println!("xz poly {:?}", xz_poly);
+
+        xy_poly.mul(&yz_poly).mul(&xz_poly)
+
+        // let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
+		// 	UniPoly::from_coefficients_vec(vec![]),
+		// 	|sum, term| {
+		// 		let curr = cb(term);
+		// 		sum + curr
+		// 	}
+		// );
+        // let f_yz_unipoly: UniPoly = self.f_yz.terms.clone().into_iter().fold(
+		// 	UniPoly::from_coefficients_vec(vec![]),
+		// 	|sum, term| {
+		// 		let curr = cb(term);
+		// 		sum + curr
+		// 	}
+		// );
+        // let f_xz_unipoly: UniPoly = self.f_xz.terms.clone().into_iter().fold(
+		// 	UniPoly::from_coefficients_vec(vec![]),
+		// 	|sum, term| {
+		// 		let curr = cb(term);
+		// 		sum + curr
+		// 	}
+		// );
+        // f_xy_unipoly.mul(&f_yz_unipoly).mul(&f_xz_unipoly)
     }
 
     fn num_vars(&self) -> usize {

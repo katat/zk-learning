@@ -5,7 +5,7 @@ use thaler::triangles::{TriangleMLE, MLEAlgorithm, TriangleGraph};
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
 
 // a gi lookup table
-fn build_gi_lookup(g: &TriangleMLE<F251>) -> Vec<sumcheck::UniPoly> {
+fn build_gi_lookup(g: &TriangleMLE<F251>) -> Vec<sumcheck::UniPoly<F251>> {
 	let r: Option<F251> = Some(1u32.into());
 	let mut lookup= vec![];
 	let mut p: Prover<TriangleMLE<F251>> = sumcheck::Prover::<TriangleMLE<F251>>::new(g);
@@ -47,7 +47,7 @@ fn bench_verifier_steps(c: &mut Criterion) {
 			let g_sum = p.slow_sum_g();
 			let lookup = build_gi_lookup(&g);
 		
-			let mut v: Verifier<UniPoly, TriangleMLE<F251>> = Verifier::new(g_sum, Rc::new(g.clone()));
+			let mut v: Verifier<UniPoly<F251>, TriangleMLE<F251>> = Verifier::new(g_sum, Rc::new(g.clone()));
 			v.random_func(|| F251::from(1));
 
 			assert_eq!(num_vars, lookup.len());
@@ -74,13 +74,13 @@ fn bench_verifier_steps(c: &mut Criterion) {
 fn benchmarks(c: &mut Criterion) {
 	bench_verifier_steps(c);
 
-	// bench_prover_lookup_build(c);
+	bench_prover_lookup_build(c);
 }
 
 fn bench_prover_lookup_build(c: &mut Criterion) {
 	let mut group = c.benchmark_group("prover");
 
-	let matrix_sizes = [4];
+	let matrix_sizes = [4, 8, 16, 32];
 	for size in matrix_sizes {
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
 		let g: TriangleMLE<F251> = matrix.derive_mle(MLEAlgorithm::DynamicMLE);

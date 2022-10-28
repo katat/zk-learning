@@ -1,18 +1,123 @@
 use ark_ff::{Zero, Field};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, DenseMVPolynomial};
 
-use crate::utils::n_to_vec;
+use crate::{utils::n_to_vec, sumcheck::UniPoly};
 
+#[derive(Debug, Clone)]
 pub struct MultilinearExtension<F: Field> {
 	evals: Vec<F>
 }
 
 impl <F: Field> MultilinearExtension<F> {
+	// todo accept mle algo enum 
 	pub fn new(evals: Vec<F>) -> Self {
 		MultilinearExtension {
 			evals
 		}
 	}
+
+	pub fn fix_vars(&mut self, fixed_vars: &[usize], partial_point: Vec<F>){
+		let mut points = Vec::<Vec<F>>::new();
+		let mut evals = Vec::<F>::new();
+
+		match fixed_vars.len() {
+			0 => {
+				points.push(partial_point);
+			}
+			Default => {
+				for var in fixed_vars {
+					for b in [F::zero(), F::one()] {
+						let mut point = partial_point.clone();
+						let loc = *var;
+						
+						if (self.evals.len() as f64).log2() != partial_point.len() as f64 {
+							point.splice(loc..loc, vec![b].iter().cloned());
+						}
+						else {
+							point.splice(loc..loc+1, vec![b].iter().cloned());
+						}
+						points.push(point);
+					}
+				};
+			}
+		}
+
+		// println!("points {:?}", points);
+
+		for point in points {
+			evals.push(self.dynamic_eval(&point));
+		}
+
+		// println!("evals {:?}", evals);
+
+		self.evals = evals;
+	}
+
+	pub fn to_evals(&self) -> Vec<F> {
+		self.evals.clone()
+	}
+
+	pub fn interpolate(&self) -> UniPoly<F> {
+		let mut sum = UniPoly::from_coefficients_vec(vec![(0, F::zero())]);
+
+		for i in 0..self.evals.len() {
+			let e = self.evals[i];
+			let eval = UniPoly::from_coefficients_vec(vec![(0, e)]);
+			
+			let mut cum_prod = UniPoly::from_coefficients_vec(vec![(0, F::one())]);
+			for k in 0..self.evals.len() {
+				
+				if i == k {
+					continue;
+				}
+				let k = F::from(k as u32);
+				// (x - k) / (i - k) = x/(i - k) - k/(i - k)
+
+				// i - k
+				let ik = F::from(i as u32) - k;
+
+				// x/(i - k)
+				let x_ik = (1, F::one() / ik);
+
+				// k/(i - k)
+				let k_ik = k / ik;
+
+				// (x - k) / (i - k)
+				let prod = UniPoly::from_coefficients_vec(vec![x_ik, (0, k_ik.neg())]);
+				cum_prod = cum_prod.mul(&prod);
+			}
+			// mul eval
+			sum += &eval.mul(&cum_prod);
+		}
+		sum
+	}
+
+	pub fn add(&self, other: MultilinearExtension<F>) -> MultilinearExtension<F> {
+		assert_eq!(self.to_evals().len(), other.to_evals().len());
+		// single row addition
+		// todo support matrix 
+		let added_evals = self.to_evals().iter().zip(other.to_evals().iter()).map(|(a, b)| {
+			a.add(b)
+		}).collect();
+
+		Self {
+			evals: added_evals
+		}
+	}
+
+	pub fn mul(&self, other: MultilinearExtension<F>) -> MultilinearExtension<F> {
+		assert_eq!(self.to_evals().len(), other.to_evals().len());
+		// single row multiplication
+		// todo support matrix
+		let multiplicated_evals = self.to_evals().iter().zip(other.to_evals().iter()).map(|(a, b)| {
+			a.mul(b)
+		}).collect();
+
+		Self {
+			evals: multiplicated_evals
+		}
+	}
+
 	// One step in chi
 	pub fn poly_chi_step(w: bool, v: usize) -> SparsePolynomial<F, SparseTerm> {
 		let one_minus_w = F::from(1 - (w as u32));

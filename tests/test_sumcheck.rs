@@ -8,6 +8,24 @@ use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, MultiPoly};
 use thaler::triangles::{TriangleMLE, TriangleGraph, MLEAlgorithm};
 
+fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
+	let len = (m.len() as f64).sqrt() as usize;
+
+	let mut matrix = Vec::new();
+	for (i, e) in m.iter().enumerate() {
+		if i % len == 0 {
+			let row = Vec::new();
+			matrix.push(row);
+		}
+		let v = F251::from(*e);
+		let row = matrix.last_mut().unwrap();
+		
+		row.push(v);
+	}
+
+	matrix
+}
+
 lazy_static! {
 	static ref G_0: MultiPoly = SparsePolynomial::from_coefficients_vec(
 		3,
@@ -48,3 +66,14 @@ fn sumcheck_multi_poly_test(#[case] p: &sumcheck::MultiPoly, #[case] c: &F251) {
 fn sumcheck_triangles_test(#[case] p: &TriangleMLE<F251>, #[case] c: &F251) {
 	assert!(sumcheck::verify::<TriangleMLE<F251>>(p, *c));
 }
+
+#[rstest]
+fn sumcheck_triangles_2_test() {
+	let m = convert_vec(&[0, 1, 1, 0]);
+    let matrix = TriangleGraph::new(m.to_vec());
+	let g = matrix.derive_mle(MLEAlgorithm::SlowMLE);
+	let sum: F251 = sumcheck::Prover::<TriangleMLE<F251>>::new(&g).slow_sum_g();
+
+	assert!(sumcheck::verify::<TriangleMLE<F251>>(&g, sum));
+}
+

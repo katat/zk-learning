@@ -2,7 +2,8 @@
 extern crate lazy_static;
 
 use rstest::rstest;
-use thaler::{small_fields::F251, triangles::{TriangleGraph}};
+use thaler::{small_fields::F251, triangles::{TriangleGraph, MLEAlgorithm, TriangleMLE}, utils::convert_field};
+use thaler::sumcheck::SumCheckPolynomial;
 
 fn convert_vec (m: &[i32]) -> Vec<Vec<F251>> {
     let len = (m.len() as f64).sqrt() as usize;
@@ -39,4 +40,17 @@ fn naive_count_test(
 ) {
     let matrix = TriangleGraph::new(m.to_vec());
 	assert_eq!(matrix.count(), expected);
+}
+
+#[rstest]
+fn var_fixed_evaluate_test() {
+    let m = convert_vec(&[
+        0, 1, 
+        1, 0, 
+    ]);
+    let matrix = TriangleGraph::new(m.to_vec());
+    let triangle: TriangleMLE<F251> = matrix.derive_mle(MLEAlgorithm::SlowMLE);
+    let point = convert_field(&[/*x*/0,/*y*/0,/*z*/1]);
+    let p = triangle.var_fixed_evaluate(0, point);
+    println!("poly {:?}", p);
 }
