@@ -1,9 +1,9 @@
 use std::{iter};
 
 use ark_ff::{Field};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}};
+use ark_poly::{multivariate::{SparseTerm, Term}};
 
-use crate::{lagrange::{MultilinearExtension, MLEAlgorithm}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{lagrange::{MultilinearExtension}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct TriangleGraph <F: Field>  {
@@ -63,18 +63,17 @@ impl <F: Field> TriangleGraph<F> {
         number.div(F::from(6u32))
     }
 
-    pub fn derive_mle(&self, mode: MLEAlgorithm) -> TriangleMLE<F> {
-        TriangleMLE::new(self.clone(), mode)
+    pub fn derive_mle <E: MultilinearExtension<F>>(&self) -> TriangleMLE<F, E> {
+        TriangleMLE::new(self.clone())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct TriangleMLE <F: Field> {
+pub struct TriangleMLE <F: Field, E: MultilinearExtension<F>> {
 	pub matrix: TriangleGraph<F>,
-    f_xy: SparsePolynomial<F, SparseTerm>,
-    f_yz: SparsePolynomial<F, SparseTerm>,
-    f_xz: SparsePolynomial<F, SparseTerm>,
-    eval_type: MLEAlgorithm
+    f_xy: E,
+    f_yz: E,
+    f_xz: E,
 }
 
 pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
@@ -102,8 +101,8 @@ pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
     x
 }
 
-impl <F: Field> TriangleMLE <F> {
-    pub fn new(matrix: TriangleGraph<F>, eval_type: MLEAlgorithm) -> Self {
+impl <F: Field, E: MultilinearExtension<F>> TriangleMLE <F, E> {
+    pub fn new(matrix: TriangleGraph<F>) -> Self {
         let a: Vec<F> = matrix.flatten();
         let var_num = matrix.one_dimension_size();
     
@@ -124,19 +123,13 @@ impl <F: Field> TriangleMLE <F> {
         let mut xz_indexes: Vec<usize> = x_indexes;
         xz_indexes.append(&mut z_indexes);
 
-        let mle = MultilinearExtension::new(a, eval_type.clone());
-        //optimize these polynomial representations
-        // todo refactor these into mle eval type
-        let poly_exist_xy = mle.poly_slow_mle(&xy_indexes);
-        let poly_exist_yz = mle.poly_slow_mle(&yz_indexes);
-        let poly_exist_xz = mle.poly_slow_mle(&xz_indexes);
+        let mle = E::new(a);
 
         TriangleMLE {
             matrix,
-            f_xy: poly_exist_xy,
-            f_yz: poly_exist_yz,
-            f_xz: poly_exist_xz,
-            eval_type,
+            f_xy: mle.clone(),
+            f_yz: mle.clone(),
+            f_xz: mle.clone(),
         }
     }
 }
@@ -156,11 +149,7 @@ fn mul<F: Field>(cur: Vec<(F, SparseTerm)>, other: Vec<(F, SparseTerm)>) -> Vec<
     result_terms
 }
 
-impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
-    fn terms(&self) -> Vec<(F, SparseTerm)> {
-        mul(mul(self.f_xy.terms.clone(), self.f_yz.terms.clone()), self.f_xz.terms.clone())
-    }
-
+impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleMLE<F, E> {
     fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
         // println!("\x1b[93mpoint {:?}\x1b[0m", point);
 
@@ -176,9 +165,9 @@ impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
         // println!("yz point {:?}", point_yz);
         // println!("xz point {:?}", point_xz);
 
-        let mut xy_mle = MultilinearExtension::new(self.matrix.flatten(), MLEAlgorithm::Dynamic);
-        let mut yz_mle = MultilinearExtension::new(self.matrix.flatten(), MLEAlgorithm::Dynamic);
-        let mut xz_mle = MultilinearExtension::new(self.matrix.flatten(), MLEAlgorithm::Dynamic);
+        let mut xy_mle = E::new(self.matrix.flatten());
+        let mut yz_mle = E::new(self.matrix.flatten());
+        let mut xz_mle = E::new(self.matrix.flatten());
 
         let mut xy_var= vec![];
         let mut yz_var= vec![];
@@ -244,11 +233,7 @@ impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
     }
 
     fn num_vars(&self) -> usize {
-        *[
-            self.f_xy.num_vars,
-            self.f_yz.num_vars,
-            self.f_xz.num_vars,
-        ].iter().max().unwrap()
+        (self.f_xy.num_vars() + self.f_yz.num_vars() + self.f_xz.num_vars()) / 2
     }
 
     fn evaluate(&self, point: &Vec<F>) -> F {
@@ -264,7 +249,7 @@ impl <F: Field> SumCheckPolynomial<F> for TriangleMLE<F> {
         // let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
         // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
         // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
-        let mle = MultilinearExtension::new(self.matrix.flatten(), self.eval_type.clone());
+        let mle = E::new(self.matrix.flatten());
         let xy_eval = mle.evaluate(&point_xy.to_vec());
         let yz_eval = mle.evaluate(&point_yz.to_vec());
         let xz_eval = mle.evaluate(&point_xz);

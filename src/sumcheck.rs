@@ -7,8 +7,6 @@ use ark_poly::polynomial::{Polynomial};
 use ark_std::cfg_into_iter;
 use rand::Rng;
 
-use crate::small_fields::F251;
-
 // refactor field to be generic
 pub type MultiPoly<F> = SparsePolynomial<F, SparseTerm>;
 pub type UniPoly<F> = UniSparsePolynomial<F>;
@@ -28,16 +26,15 @@ pub fn n_to_vec<F: Field>(i: usize, n: usize) -> Vec<F> {
 }
 
 pub trait SumCheckPolynomial<F> where F: Field {
-    fn terms(&self) -> Vec<(F, SparseTerm)>;
 	fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F>;
     fn num_vars(&self) -> usize;
     fn evaluate(&self, point: &Vec<F>) -> F;
 }
 
 impl <F: Field> SumCheckPolynomial<F> for MultiPoly<F> {
-    fn terms(&self) -> Vec<(F, SparseTerm)> {
-		self.terms.to_vec()
-    }
+    // fn terms(&self) -> Vec<(F, SparseTerm)> {
+	// 	self.terms.to_vec()
+    // }
 
     fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
         todo!();
@@ -203,19 +200,6 @@ impl <F: Field, P: SumCheckPolynomial<F>> Prover<F, P> where P: Clone {
 			.map(|n| self.g.evaluate(&n_to_vec(n as usize, v)))
 			.sum()
 	}
-}
-
-// A degree look up table for all variables in g
-pub fn max_degrees<P: SumCheckPolynomial<F251>>(g: &P) -> Vec<usize> {
-	let mut lookup: Vec<usize> = vec![0; g.num_vars()];
-	cfg_into_iter!(g.terms().clone()).for_each(|(_, term)| {
-		cfg_into_iter!(term).for_each(|(var, power)| {
-			if *power > lookup[*var] {
-				lookup[*var] = *power
-			}
-		});
-	});
-	lookup
 }
 
 pub fn verify<F: Field, P: SumCheckPolynomial<F>>(g: &P, c_1: F) -> bool where P: Clone{

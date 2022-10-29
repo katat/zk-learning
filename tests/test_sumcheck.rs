@@ -4,7 +4,7 @@ extern crate lazy_static;
 use ark_poly::DenseMVPolynomial;
 use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
 use rstest::rstest;
-use thaler::lagrange::MLEAlgorithm;
+use thaler::mles::dynamic_mle::DynamicMultilinearExtension;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, MultiPoly};
 use thaler::triangles::{TriangleMLE, TriangleGraph};
@@ -53,8 +53,8 @@ lazy_static! {
 	static ref G_1_SUM: TestField = sumcheck::Prover::<TestField, SumCheckPoly>::new(&G_1).slow_sum_g();
 
 	static ref M: TriangleGraph<TestField> = TriangleGraph::new(thaler::utils::gen_matrix(4));
-	static ref G_2: TriangleMLE<TestField> = M.derive_mle(MLEAlgorithm::Dynamic);
-	static ref G_2_SUM: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField>>::new(&G_2).slow_sum_g();
+	static ref G_2: TriangleMLE<TestField, DynamicMultilinearExtension<TestField>> = M.derive_mle();
+	static ref G_2_SUM: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField, DynamicMultilinearExtension<TestField>>>::new(&G_2).slow_sum_g();
 
 }
 
@@ -67,17 +67,17 @@ fn sumcheck_multi_poly_test(#[case] p: &SumCheckPoly, #[case] c: &TestField) {
 
 #[rstest]
 #[case(&G_2, &G_2_SUM)]
-fn sumcheck_triangles_test(#[case] p: &TriangleMLE<TestField>, #[case] c: &TestField) {
-	assert!(sumcheck::verify::<TestField, TriangleMLE<TestField>>(p, *c));
+fn sumcheck_triangles_test(#[case] p: &TriangleMLE<TestField, DynamicMultilinearExtension<TestField>>, #[case] c: &TestField) {
+	assert!(sumcheck::verify::<TestField, TriangleMLE<TestField, DynamicMultilinearExtension<TestField>>>(p, *c));
 }
 
 #[rstest]
 fn sumcheck_triangles_2_test() {
 	let m = convert_vec(&[0, 1, 1, 0]);
     let matrix = TriangleGraph::new(m.to_vec());
-	let g = matrix.derive_mle(MLEAlgorithm::Slow);
-	let sum: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField>>::new(&g).slow_sum_g();
+	let g: TriangleMLE<TestField, DynamicMultilinearExtension<TestField>> = matrix.derive_mle();
+	let sum: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField, DynamicMultilinearExtension<TestField>>>::new(&g).slow_sum_g();
 
-	assert!(sumcheck::verify::<TestField, TriangleMLE<TestField>>(&g, sum));
+	assert!(sumcheck::verify::<TestField, TriangleMLE<TestField, DynamicMultilinearExtension<TestField>>>(&g, sum));
 }
 
