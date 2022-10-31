@@ -32,12 +32,12 @@ impl <F: Field> MultilinearExtension<F> for DynamicMultilinearExtension<F> {
 						let mut point = partial_point.clone();
 						let loc = *var;
 						
-						if (self.to_evals().len() as f64).log2() != partial_point.len() as f64 {
-							point.splice(loc..loc, vec![b].iter().cloned());
-						}
-						else {
-							point.splice(loc..loc+1, vec![b].iter().cloned());
-						}		
+						// if (self.to_evals().len() as f64).log2() != partial_point.len() as f64 {
+						// 	point.splice(loc..loc, vec![b].iter().cloned());
+						// }
+						// else {
+                        // }		
+                        point.splice(loc..loc+1, vec![b].iter().cloned());
 						points.push(point);
 					}
 				};
@@ -47,6 +47,7 @@ impl <F: Field> MultilinearExtension<F> for DynamicMultilinearExtension<F> {
 		// println!("points {:?}", points);
 
 		for point in points {
+            // let p = self.indexes.iter().map(|i| point[*i]).collect();
 			evals.push(self.evaluate(&point));
 		}
 
@@ -60,7 +61,8 @@ impl <F: Field> MultilinearExtension<F> for DynamicMultilinearExtension<F> {
 	}
 
 	fn evaluate(&self, point: &Vec<F>) -> F {
-		self.dynamic_eval(point)
+        let p: Vec<F> = self.indexes.iter().map(|i| point[*i]).collect();
+		self.dynamic_eval(&p)
 	}
 
 	fn to_evals(&self) -> Vec<F> {

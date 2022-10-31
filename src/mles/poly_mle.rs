@@ -14,7 +14,7 @@ pub struct PolyMultilinearExtension<F: Field> {
 
 impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 	fn new(evals: Vec<F>, indexes: Option<Vec<usize>>) -> Self {
-		println!("indexes {:?}", indexes);
+		// println!("indexes {:?}", indexes);
 		PolyMultilinearExtension {
 			evals: evals.clone(),
 			p: Self::poly_slow_mle(&evals, &indexes.clone().unwrap()),
@@ -24,12 +24,12 @@ impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 	}
 
 	fn fix_vars(&mut self, fixed_vars: &[usize], partial_point: Vec<F>) {
-		let point = self.convert_partial_point(partial_point.clone());
+		let point = partial_point;
 		// println!("indexes {:?}", self.indexes);
 		// println!("partial point {:?}", partial_point);
 		// println!("point {:?}", point);
 		// println!("p {:?}", self.p);
-		println!("var {:?}", fixed_vars);
+		// println!("var {:?}", fixed_vars);
 
 		match fixed_vars.len() {
 			0 => {
@@ -84,8 +84,7 @@ impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 	}
 
 	fn evaluate(&self, point: &Vec<F>) -> F {
-		let point = self.convert_partial_point(point.to_vec());
-		self.p.clone().evaluate(&point)
+		self.p.clone().evaluate(point)
 	}
 
 	fn to_evals(&self) -> Vec<F> {

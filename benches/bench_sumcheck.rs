@@ -2,6 +2,7 @@ use std::rc::Rc;
 use ark_ff::Field;
 use thaler::lagrange::{MultilinearExtension};
 use thaler::mles::dynamic_mle::DynamicMultilinearExtension;
+use thaler::mles::poly_mle::PolyMultilinearExtension;
 use thaler::mles::slow_mle::SlowMultilinearExtension;
 use thaler::mles::stream_mle::StreamMultilinearExtension;
 use thaler::small_fields::{F251};
@@ -73,9 +74,10 @@ fn bench_verifier_steps<F, E>(c: &mut Criterion, eval_type: &str) where F: Field
 }
 
 fn benchmarks(c: &mut Criterion) {
-	bench_verifier_steps::<TestField, SlowMultilinearExtension<TestField>>(c, "slow");
-	bench_verifier_steps::<TestField, StreamMultilinearExtension<TestField>>(c, "stream");
+	// bench_verifier_steps::<TestField, SlowMultilinearExtension<TestField>>(c, "slow");
+	// bench_verifier_steps::<TestField, StreamMultilinearExtension<TestField>>(c, "stream");
 	bench_verifier_steps::<TestField, DynamicMultilinearExtension<TestField>>(c, "dynamic");
+	// bench_verifier_steps::<TestField, PolyMultilinearExtension<TestField>>(c, "polynomial");
 
 	bench_prover_lookup_build(c);
 }

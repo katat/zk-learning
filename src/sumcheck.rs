@@ -119,15 +119,15 @@ impl <F: Field, P: Polynomial<F, Point = F>, G: SumCheckPolynomial<F>> Verifier<
 				let g_i = g_i.unwrap();
 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
 				assert_eq!(self.c_1, new_c);
-				println!("first round {:?} {:?}", self.c_1, new_c);
+				// println!("first round {:?} {:?}", self.c_1, new_c);
 				// println!("g_1");
 				self.prev_g_i = Some(g_i);
 			},
 			Some(Round::Middle(_)) => {
 				let g_i = g_i.unwrap();
 				let last_r = self.r_vec.last().unwrap();
-				println!("last r {}", last_r);
-				println!("prev gi {:?}", self.prev_g_i);
+				// println!("last r {}", last_r);
+				// println!("prev gi {:?}", self.prev_g_i);
 				let expected_c = self.prev_g_i.as_ref().unwrap().evaluate(last_r);
 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
 				assert_eq!(expected_c, new_c);
@@ -188,7 +188,7 @@ pub fn verify<F: Field, P: SumCheckPolynomial<F>>(g: &P, c_1: F) -> bool where P
 	let mut p = Prover::new(g);
 
 	let mut v: Verifier<F, UniPoly<F>, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
-	v.random_func(|| F::from(1u32));
+	// v.random_func(|| F::from(1u32));
 	while v.current_round != Some(Round::Final()) {
 		println!("\x1b[93m round {:?}\x1b[0m", v.current_round);
 		let r = v.r_vec.last();
@@ -196,7 +196,7 @@ pub fn verify<F: Field, P: SumCheckPolynomial<F>>(g: &P, c_1: F) -> bool where P
 			None => p.gen_uni_polynomial(None),
 			_default => p.gen_uni_polynomial(Some(*r.unwrap()))
 		};
-		println!("gi {:?}", gi);
+		// println!("gi {:?}", gi);
 
 		v.verify(Some(gi));
 	}

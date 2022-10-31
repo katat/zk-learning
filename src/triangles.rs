@@ -137,49 +137,15 @@ impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleML
     fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
         // println!("\x1b[93mpoint {:?}\x1b[0m", point);
 
-        let dim = self.matrix.one_dimension_size();
-        let y_start_index = dim;
-        let z_start_index = dim * 2;
         // prepend r_vec
-        let point_xy = &point[0..(z_start_index)];
-        let point_yz = &point[y_start_index..(z_start_index + self.matrix.one_dimension_size())];
-        let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
-
-        // println!("xy point {:?}", point_xy);
-        // println!("yz point {:?}", point_yz);
-        // println!("xz point {:?}", point_xz);
-
-        let mut xy_var= vec![];
-        let mut yz_var= vec![];
-        let mut xz_var= vec![];
-        if var < z_start_index {
-            xy_var.push(var);
-            if var < y_start_index {
-                xz_var.push(var);
-            }
-            else {
-                yz_var.push(var);
-            }
-        }
-        else {
-            yz_var.push(var);
-            xz_var.push(var);
-        }
-
-        // println!("xy var {:?}", xy_var);
-        // println!("yz var {:?}", yz_var);
-        // println!("xz var {:?}", xz_var);
 
         let mut f_xy = self.f_xy.clone();
         let mut f_yz = self.f_yz.clone();
         let mut f_xz = self.f_xz.clone();
 
-        println!("f xy var");
-        f_xy.fix_vars(&xy_var, point_xy.to_vec());
-        println!("f yz var");
-        f_yz.fix_vars(&yz_var, point_yz.to_vec());
-        println!("f xz var");
-        f_xz.fix_vars(&xz_var, point_xz.to_vec());
+        f_xy.fix_vars(&[var], point.to_vec());
+        f_yz.fix_vars(&[var], point.to_vec());
+        f_xz.fix_vars(&[var], point.to_vec());
 
         // println!("xy mle fixed vars, evals {:?}", xy_mle.to_evals());
         // println!("yz mle fixed vars, evals {:?}", yz_mle.to_evals());
@@ -224,15 +190,9 @@ impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleML
     }
 
     fn evaluate(&self, point: &Vec<F>) -> F {
-        let y_start_index = self.matrix.one_dimension_size();
-        let z_start_index = self.matrix.one_dimension_size() * 2;
-        let point_xy = &point[0..(z_start_index)];
-        let point_yz = &point[y_start_index..(z_start_index + self.matrix.one_dimension_size())];
-        let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
-
-        let xy_eval = self.f_xy.evaluate(&point_xy.to_vec());
-        let yz_eval = self.f_yz.evaluate(&point_yz.to_vec());
-        let xz_eval = self.f_xz.evaluate(&point_xz);
+        let xy_eval = self.f_xy.evaluate(point);
+        let yz_eval = self.f_yz.evaluate(point);
+        let xz_eval = self.f_xz.evaluate(point);
 
         xy_eval * yz_eval * xz_eval
     }

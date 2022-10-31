@@ -5,12 +5,14 @@ use crate::{lagrange::MultilinearExtension, sumcheck::UniPoly, utils::n_to_vec};
 #[derive(Debug, Clone)]
 pub struct SlowMultilinearExtension<F: Field> {
 	evals: Vec<F>,
+    indexes: Vec<usize>,
 }
 
 impl <F: Field> MultilinearExtension<F> for SlowMultilinearExtension<F> {
-	fn new(evals: Vec<F>, _: Option<Vec<usize>>) -> Self {
+	fn new(evals: Vec<F>, indexes: Option<Vec<usize>>) -> Self {
 		SlowMultilinearExtension {
 			evals,
+			indexes: indexes.unwrap()
 		}
 	}
 
@@ -28,12 +30,7 @@ impl <F: Field> MultilinearExtension<F> for SlowMultilinearExtension<F> {
 						let mut point = partial_point.clone();
 						let loc = *var;
 						
-						if (self.to_evals().len() as f64).log2() != partial_point.len() as f64 {
-							point.splice(loc..loc, vec![b].iter().cloned());
-						}
-						else {
-							point.splice(loc..loc+1, vec![b].iter().cloned());
-						}		
+						point.splice(loc..loc+1, vec![b].iter().cloned());
 						points.push(point);
 					}
 				};
@@ -56,7 +53,8 @@ impl <F: Field> MultilinearExtension<F> for SlowMultilinearExtension<F> {
 	}
 
 	fn evaluate(&self, point: &Vec<F>) -> F {
-		self.slow_eval(point)
+        let p: Vec<F> = self.indexes.iter().map(|i| point[*i]).collect();
+		self.slow_eval(&p)
 	}
 
 	fn to_evals(&self) -> Vec<F> {
