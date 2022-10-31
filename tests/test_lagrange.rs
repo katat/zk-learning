@@ -9,7 +9,7 @@ use thaler::{
 	mles::{
 		slow_mle::SlowMultilinearExtension, 
 		dynamic_mle::DynamicMultilinearExtension, 
-		stream_mle::StreamMultilinearExtension,
+		stream_mle::StreamMultilinearExtension, poly_mle::PolyMultilinearExtension,
 	},
 	utils::{convert_field, n_to_vec}, 
 	sumcheck::UniPoly
@@ -43,14 +43,14 @@ fn slow_lagrange_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	let mle: SlowMultilinearExtension<TestField> = lagrange::MultilinearExtension::new(fw.clone());
+	let mle: SlowMultilinearExtension<TestField> = lagrange::MultilinearExtension::new(fw.clone(), None);
 	assert_eq!(mle.evaluate(r), expected);
 }
 
 #[rstest]
 fn t() {
 	let evals = convert_field(&[2, 4, 3, 2]);
-	let mle: DynamicMultilinearExtension<TestField> = lagrange::MultilinearExtension::new(evals);
+	let mle: DynamicMultilinearExtension<TestField> = lagrange::MultilinearExtension::new(evals, None);
 	let result: TestField = mle.evaluate(&convert_field(&[0, 0]));
 	assert_eq!(result, TestField::from(2));
 	let result: TestField = mle.evaluate(&convert_field(&[0, 1]));
@@ -82,17 +82,22 @@ fn test_fix_vars() {
 	let evals: Vec<TestField> = convert_field(&[2, 4, 3, 2]);
 
 	// full point
-	let mut mle0: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone());
+	let mut mle0: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), None);
 	mle0.fix_vars(&[], convert_field(&[0, 1]));
 	assert_eq!(mle0.to_evals(), convert_field(&[4]));
 
 	// x1
-	let mut mle1: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone());
+	let mut mle1: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), None);
 	mle1.fix_vars(&[0], [TestField::one()].to_vec());
 	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
 
+	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
+	let mut mle1: PolyMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), indexes);
+	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
+	assert_eq!(mle1.interpolate().evaluate(&TestField::zero()), TestField::from(4));
+
 	// x1 replace full point
-	let mut mle1: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone());
+	let mut mle1: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), None);
 	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
 	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
 
@@ -106,7 +111,7 @@ fn test_fix_vars() {
 	assert_eq!(uni.evaluate(&TestField::one()), mle0.to_evals()[0]);
 
 	// x0
-	let mut mle2: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone());
+	let mut mle2: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), None);
 	mle2.fix_vars(&[0], [TestField::zero()].to_vec());
 	assert_eq!(mle2.to_evals(), convert_field(&[2, 3]));
 
@@ -132,7 +137,7 @@ fn stream_lagrange_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	let mle: StreamMultilinearExtension<TestField> = MultilinearExtension::new(fw.clone());
+	let mle: StreamMultilinearExtension<TestField> = MultilinearExtension::new(fw.clone(), None);
 	assert_eq!(mle.stream_eval(r), expected);
 }
 
@@ -146,7 +151,7 @@ fn dynamic_mle_test(
 	#[case] r: &Vec<TestField>,
 	#[case] expected: TestField,
 ) {
-	let mle = DynamicMultilinearExtension::new(fw.clone());
+	let mle = DynamicMultilinearExtension::new(fw.clone(), None);
 	assert_eq!(mle.dynamic_eval(r), expected);
 }
 

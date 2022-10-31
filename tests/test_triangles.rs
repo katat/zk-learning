@@ -56,7 +56,7 @@ fn var_fixed_evaluate_test() {
         1, 0, 
     ]);
     let matrix = TriangleGraph::new(m.to_vec());
-    let triangle: TriangleMLE<TestField, DynamicMultilinearExtension<TestField>> = matrix.derive_mle();
+    let mut triangle: TriangleMLE<TestField, DynamicMultilinearExtension<TestField>> = matrix.derive_mle();
     let point = convert_field(&[/*x*/0,/*y*/0,/*z*/1]);
     let p = triangle.var_fixed_evaluate(0, point);
     println!("poly {:?}", p);

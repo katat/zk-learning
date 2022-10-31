@@ -8,7 +8,7 @@ pub struct SlowMultilinearExtension<F: Field> {
 }
 
 impl <F: Field> MultilinearExtension<F> for SlowMultilinearExtension<F> {
-	fn new(evals: Vec<F>) -> Self {
+	fn new(evals: Vec<F>, _: Option<Vec<usize>>) -> Self {
 		SlowMultilinearExtension {
 			evals,
 		}

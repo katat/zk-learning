@@ -1,8 +1,5 @@
 use std::{iter};
-
 use ark_ff::{Field};
-use ark_poly::{multivariate::{SparseTerm, Term}};
-
 use crate::{lagrange::{MultilinearExtension}, sumcheck::{SumCheckPolynomial, UniPoly}};
 
 #[derive(Debug, Clone)]
@@ -123,30 +120,17 @@ impl <F: Field, E: MultilinearExtension<F>> TriangleMLE <F, E> {
         let mut xz_indexes: Vec<usize> = x_indexes;
         xz_indexes.append(&mut z_indexes);
 
-        let mle = E::new(a);
+        let xy_mle = E::new(a.clone(), Option::Some(xy_indexes.clone()));
+        let yz_mle = E::new(a.clone(), Option::Some(yz_indexes.clone()));
+        let xz_mle = E::new(a.clone(), Option::Some(xz_indexes));
 
         TriangleMLE {
             matrix,
-            f_xy: mle.clone(),
-            f_yz: mle.clone(),
-            f_xz: mle.clone(),
+            f_xy: xy_mle.clone(),
+            f_yz: yz_mle.clone(),
+            f_xz: xz_mle.clone(),
         }
     }
-}
-
-fn mul<F: Field>(cur: Vec<(F, SparseTerm)>, other: Vec<(F, SparseTerm)>) -> Vec<(F, SparseTerm)> {
-    let mut result_terms = Vec::new();
-    for (cur_coeff, cur_term) in cur.iter() {
-        for (other_coeff, other_term) in other.iter() {
-            let mut term: Vec<(usize, usize)> = cur_term.vars().iter().zip(cur_term.powers()).map(|(v, p)| (*v, p)).collect();
-            term.extend(
-                other_term.vars().iter().zip(other_term.powers()).map(|(v, p)| (*v, p))
-            );
-            let coeff = *cur_coeff * *other_coeff;
-            result_terms.push((coeff, SparseTerm::new(term)));
-        }
-    }
-    result_terms
 }
 
 impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleMLE<F, E> {
@@ -165,10 +149,6 @@ impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleML
         // println!("yz point {:?}", point_yz);
         // println!("xz point {:?}", point_xz);
 
-        let mut xy_mle = E::new(self.matrix.flatten());
-        let mut yz_mle = E::new(self.matrix.flatten());
-        let mut xz_mle = E::new(self.matrix.flatten());
-
         let mut xy_var= vec![];
         let mut yz_var= vec![];
         let mut xz_var= vec![];
@@ -178,29 +158,36 @@ impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleML
                 xz_var.push(var);
             }
             else {
-                yz_var.push(var - dim);
+                yz_var.push(var);
             }
         }
         else {
-            yz_var.push(var - dim);
-            xz_var.push(var - dim);
+            yz_var.push(var);
+            xz_var.push(var);
         }
 
         // println!("xy var {:?}", xy_var);
         // println!("yz var {:?}", yz_var);
         // println!("xz var {:?}", xz_var);
 
-        xy_mle.fix_vars(&xy_var, point_xy.to_vec());
-        yz_mle.fix_vars(&yz_var, point_yz.to_vec());
-        xz_mle.fix_vars(&xz_var, point_xz.to_vec());
+        let mut f_xy = self.f_xy.clone();
+        let mut f_yz = self.f_yz.clone();
+        let mut f_xz = self.f_xz.clone();
+
+        println!("f xy var");
+        f_xy.fix_vars(&xy_var, point_xy.to_vec());
+        println!("f yz var");
+        f_yz.fix_vars(&yz_var, point_yz.to_vec());
+        println!("f xz var");
+        f_xz.fix_vars(&xz_var, point_xz.to_vec());
 
         // println!("xy mle fixed vars, evals {:?}", xy_mle.to_evals());
         // println!("yz mle fixed vars, evals {:?}", yz_mle.to_evals());
         // println!("xz mle fixed vars, evals {:?}", xz_mle.to_evals());
 
-        let xy_poly = xy_mle.interpolate();
-        let yz_poly = yz_mle.interpolate();
-        let xz_poly = xz_mle.interpolate();
+        let xy_poly = f_xy.interpolate();
+        let yz_poly = f_yz.interpolate();
+        let xz_poly = f_xz.interpolate();
 
         // println!("xy poly {:?}", xy_poly);
         // println!("yz poly {:?}", yz_poly);
@@ -243,41 +230,10 @@ impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleML
         let point_yz = &point[y_start_index..(z_start_index + self.matrix.one_dimension_size())];
         let point_xz = [&point[0..(y_start_index)], &point[z_start_index..]].concat();
 
-        // let xy_eval = eval_slow_mle(&self.matrix.flatten(), &point_xy.to_vec());
-        // let yz_eval = eval_slow_mle(&self.matrix.flatten(), &point_yz.to_vec());
-        // let xz_eval = eval_slow_mle(&self.matrix.flatten(), &point_xz.to_vec());
-        // let xyp = point_xy.iter().map(|e| poly_constant(*e)).collect();
-        // let yzp = point_yz.iter().map(|e| poly_constant(*e)).collect();
-        // let xzp = point_xz.iter().map(|e| poly_constant(*e)).collect();
-        let mle = E::new(self.matrix.flatten());
-        let xy_eval = mle.evaluate(&point_xy.to_vec());
-        let yz_eval = mle.evaluate(&point_yz.to_vec());
-        let xz_eval = mle.evaluate(&point_xz);
+        let xy_eval = self.f_xy.evaluate(&point_xy.to_vec());
+        let yz_eval = self.f_yz.evaluate(&point_yz.to_vec());
+        let xz_eval = self.f_xz.evaluate(&point_xz);
 
         xy_eval * yz_eval * xz_eval
-
-        // match self.eval_type {
-        //     MLEAlgorithm::SlowMLE => {
-        //         let xy_eval = mle.slow_eval(&point_xy.to_vec());
-        //         let yz_eval = mle.slow_eval(&point_yz.to_vec());
-        //         let xz_eval = mle.slow_eval(&point_xz);
-        
-        //         xy_eval * yz_eval * xz_eval
-        //     }
-        //     MLEAlgorithm::DynamicMLE => {
-        //         let xy_eval = mle.dynamic_eval(&point_xy.to_vec());
-        //         let yz_eval = mle.dynamic_eval(&point_yz.to_vec());
-        //         let xz_eval = mle.dynamic_eval(&point_xz);
-        
-        //         xy_eval * yz_eval * xz_eval
-        //     }
-        //     MLEAlgorithm::StreamMLE => {
-        //         let xy_eval = mle.stream_eval(&point_xy.to_vec());
-        //         let yz_eval = mle.stream_eval(&point_yz.to_vec());
-        //         let xz_eval = mle.stream_eval(&point_xz);
-        
-        //         xy_eval * yz_eval * xz_eval
-        //     },
-        // }
     }
 }

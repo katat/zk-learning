@@ -8,7 +8,7 @@ pub struct StreamMultilinearExtension<F: Field> {
 }
 
 impl <F: Field> MultilinearExtension<F> for StreamMultilinearExtension<F> {
-	fn new(evals: Vec<F>) -> Self {
+	fn new(evals: Vec<F>, _: Option<Vec<usize>>) -> Self {
 		StreamMultilinearExtension {
 			evals,
 		}

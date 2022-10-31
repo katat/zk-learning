@@ -119,13 +119,15 @@ impl <F: Field, P: Polynomial<F, Point = F>, G: SumCheckPolynomial<F>> Verifier<
 				let g_i = g_i.unwrap();
 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
 				assert_eq!(self.c_1, new_c);
+				println!("first round {:?} {:?}", self.c_1, new_c);
 				// println!("g_1");
 				self.prev_g_i = Some(g_i);
 			},
 			Some(Round::Middle(_)) => {
 				let g_i = g_i.unwrap();
 				let last_r = self.r_vec.last().unwrap();
-				// println!("last r {}", last_r);
+				println!("last r {}", last_r);
+				println!("prev gi {:?}", self.prev_g_i);
 				let expected_c = self.prev_g_i.as_ref().unwrap().evaluate(last_r);
 				let new_c = g_i.evaluate(&0u32.into()) + g_i.evaluate(&1u32.into());
 				assert_eq!(expected_c, new_c);
@@ -163,7 +165,6 @@ impl <F: Field, P: SumCheckPolynomial<F>> Prover<F, P> where P: Clone {
 			|sum, n| {
 				let point = n_to_vec(n as usize, v);
 				let gj = self.evaluate_gj(point.clone());
-				// println!("\x1b[93m gj {:?}\x1b[0m", gj);
 				sum + gj
 			},
 		)
@@ -171,25 +172,6 @@ impl <F: Field, P: SumCheckPolynomial<F>> Prover<F, P> where P: Clone {
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
 	pub fn evaluate_gj(&self, points: Vec<F>) -> UniPoly<F> {
 		self.g.var_fixed_evaluate(self.r_vec.len(), [self.r_vec.to_vec(), points].concat())
-	}
-
-	// Evaluates a term with a fixed univar, returning (new coefficent, fixed term)
-	pub fn evaluate_term(
-		&self,
-		term: &SparseTerm,
-		point: &Vec<F>,
-	) -> (F, Option<SparseTerm>) {
-		let mut fixed_term: Option<SparseTerm> = None;
-		let coeff: F =
-			cfg_into_iter!(term).fold(1u32.into(), |product, (var, power)| match *var {
-				j if j == self.r_vec.len() => {
-					fixed_term = Some(SparseTerm::new(vec![(j, *power)]));
-					product
-				}
-				j if j < self.r_vec.len() => self.r_vec[j].pow(&[*power as u64]) * product,
-				_ => point[*var - self.r_vec.len()].pow(&[*power as u64]) * product,
-			});
-		(coeff, fixed_term)
 	}
 
 	// Sum all evaluations of polynomial `g` over boolean hypercube
@@ -206,12 +188,16 @@ pub fn verify<F: Field, P: SumCheckPolynomial<F>>(g: &P, c_1: F) -> bool where P
 	let mut p = Prover::new(g);
 
 	let mut v: Verifier<F, UniPoly<F>, P> = Verifier::new(c_1, Rc::new(g.to_owned()));
+	v.random_func(|| F::from(1u32));
 	while v.current_round != Some(Round::Final()) {
+		println!("\x1b[93m round {:?}\x1b[0m", v.current_round);
 		let r = v.r_vec.last();
 		let gi = match r {
 			None => p.gen_uni_polynomial(None),
 			_default => p.gen_uni_polynomial(Some(*r.unwrap()))
 		};
+		println!("gi {:?}", gi);
+
 		v.verify(Some(gi));
 	}
 

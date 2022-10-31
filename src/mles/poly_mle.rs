@@ -1,58 +1,82 @@
 use ark_ff::{Field, Zero};
-use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, DenseMVPolynomial};
+use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, DenseMVPolynomial, Polynomial};
+use ark_std::cfg_into_iter;
 
-use crate::{lagrange::MultilinearExtension, sumcheck::UniPoly, utils::n_to_vec};
+use crate::{lagrange::MultilinearExtension, sumcheck::{UniPoly, MultiPoly}, utils::n_to_vec};
 
 #[derive(Debug, Clone)]
-pub struct DynamicMultilinearExtension<F: Field> {
+pub struct PolyMultilinearExtension<F: Field> {
 	evals: Vec<F>,
-    indexes: Vec<usize>,
+	p: MultiPoly<F>,
+	u: Option<UniPoly<F>>,
+	indexes: Vec<usize>,
 }
 
-impl <F: Field> MultilinearExtension<F> for DynamicMultilinearExtension<F> {
+impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 	fn new(evals: Vec<F>, indexes: Option<Vec<usize>>) -> Self {
-		DynamicMultilinearExtension {
-			evals,
-            indexes: indexes.unwrap()
+		println!("indexes {:?}", indexes);
+		PolyMultilinearExtension {
+			evals: evals.clone(),
+			p: Self::poly_slow_mle(&evals, &indexes.clone().unwrap()),
+			u: None,
+			indexes: indexes.unwrap(),
 		}
 	}
 
-    //todo cover test for fixed_vars having more than one element
-	fn fix_vars(&mut self, fixed_vars: &[usize], partial_point: Vec<F>){
-		let mut points = Vec::<Vec<F>>::new();
-		let mut evals = Vec::<F>::new();
+	fn fix_vars(&mut self, fixed_vars: &[usize], partial_point: Vec<F>) {
+		let point = self.convert_partial_point(partial_point.clone());
+		// println!("indexes {:?}", self.indexes);
+		// println!("partial point {:?}", partial_point);
+		// println!("point {:?}", point);
+		// println!("p {:?}", self.p);
+		println!("var {:?}", fixed_vars);
 
 		match fixed_vars.len() {
 			0 => {
-				points.push(partial_point);
+				let e = self.p.evaluate(&point);
+				self.u = Some(UniPoly::from_coefficients_vec(vec![(0, e)]));
+				return
 			}
 			_ => {
-				for var in fixed_vars {
-					for b in [F::zero(), F::one()] {
-						let mut point = partial_point.clone();
-						let loc = *var;
-						
-						if (self.to_evals().len() as f64).log2() != partial_point.len() as f64 {
-							point.splice(loc..loc, vec![b].iter().cloned());
-						}
-						else {
-							point.splice(loc..loc+1, vec![b].iter().cloned());
-						}		
-						points.push(point);
-					}
-				};
 			}
 		}
 
-		// println!("points {:?}", points);
+		let p = self.p.terms.clone().into_iter().fold(
+			UniPoly::from_coefficients_vec(vec![]),
+			|sum, (coeff, term)| {
+				let curr = {
+					let (coeff_eval, fixed_term) = {
+						let mut fixed_term: Option<SparseTerm> = None;
+						let var_index = fixed_vars[0];
+						let coeff: F =
+							term.iter().fold(1u32.into(), |product, (var, power)| match *var {
+								j if j == var_index => {
+									fixed_term = Some(SparseTerm::new(vec![(j, *power)]));
+									product
+								}
+								j if j < var_index => point[j].pow(&[*power as u64]) * product,
+								// _ => point[*var - var_index].pow(&[*power as u64]) * product,
+								_ => point[*var].pow(&[*power as u64]) * product,
+							});
+						(coeff, fixed_term)
+					};
 
-		for point in points {
-			evals.push(self.evaluate(&point));
-		}
+					// println!("fixed term {:?} {:?}", fixed_term, coeff_eval);
 
-		// println!("evals {:?}", evals);
+					match fixed_term {
+						None => UniPoly::from_coefficients_vec(vec![(0, coeff * coeff_eval)]),
+						_ => UniPoly::from_coefficients_vec(vec![(
+							fixed_term.unwrap().degree(),
+							coeff * coeff_eval,
+						)]),
+					}
+				};
 
-		self.evals = evals;
+				sum + curr
+			}
+		);
+
+		self.u = Some(p);
 	}
 
 	fn num_vars(&self) -> usize {
@@ -60,7 +84,8 @@ impl <F: Field> MultilinearExtension<F> for DynamicMultilinearExtension<F> {
 	}
 
 	fn evaluate(&self, point: &Vec<F>) -> F {
-		self.dynamic_eval(point)
+		let point = self.convert_partial_point(point.to_vec());
+		self.p.clone().evaluate(&point)
 	}
 
 	fn to_evals(&self) -> Vec<F> {
@@ -68,43 +93,33 @@ impl <F: Field> MultilinearExtension<F> for DynamicMultilinearExtension<F> {
 	}
 
 	fn interpolate(&self) -> UniPoly<F> {
-		let mut sum = UniPoly::from_coefficients_vec(vec![(0, F::zero())]);
-
-		for i in 0..self.evals.len() {
-			let e = self.evals[i];
-			let eval = UniPoly::from_coefficients_vec(vec![(0, e)]);
-			
-			let mut cum_prod = UniPoly::from_coefficients_vec(vec![(0, F::one())]);
-			for k in 0..self.evals.len() {
-				
-				if i == k {
-					continue;
-				}
-				let k = F::from(k as u32);
-				// (x - k) / (i - k) = x/(i - k) - k/(i - k)
-
-				// i - k
-				let ik = F::from(i as u32) - k;
-
-				// x/(i - k)
-				let x_ik = (1, F::one() / ik);
-
-				// k/(i - k)
-				let k_ik = k / ik;
-
-				// (x - k) / (i - k)
-				let prod = UniPoly::from_coefficients_vec(vec![x_ik, (0, k_ik.neg())]);
-				cum_prod = cum_prod.mul(&prod);
-			}
-			// mul eval
-			sum += &eval.mul(&cum_prod);
-		}
-		sum
+		self.u.clone().unwrap()
 	}
-
 }
 
-impl <F: Field> DynamicMultilinearExtension<F> {
+impl <F: Field> PolyMultilinearExtension<F> {
+	fn convert_partial_point(&self, point: Vec<F>) -> Vec<F> {
+		let mut j = 0;
+		let max_var = *self.indexes.iter().max().unwrap();
+		let mut p = point;
+		for i in 0..max_var {
+			if i != self.indexes[j] {
+				p.splice(i..i, vec![F::zero()].iter().cloned());
+			}
+			else {
+				j += 1;
+			}
+		}
+
+		p
+	}
+
+	pub fn poly_constant(c: F) -> SparsePolynomial<F, SparseTerm> {
+		SparsePolynomial::from_coefficients_vec(
+			0, 
+			vec![(c, SparseTerm::new(vec![]))]
+		)
+	}
 	// One step in chi
 	pub fn poly_chi_step(w: bool, v: usize) -> SparsePolynomial<F, SparseTerm> {
 		let one_minus_w = F::from(1 - (w as u32));
@@ -168,8 +183,8 @@ impl <F: Field> DynamicMultilinearExtension<F> {
 	}
 	
 	// Calculating the slow way, for benchmarking
-	pub fn poly_slow_mle(&self, vars: &Vec<usize>) -> SparsePolynomial<F, SparseTerm> {
-		let sum: SparsePolynomial<F, SparseTerm> = self.evals
+	pub fn poly_slow_mle(evals: &Vec<F>, vars: &Vec<usize>) -> SparsePolynomial<F, SparseTerm> {
+		let sum: SparsePolynomial<F, SparseTerm> = evals
 			.iter()
 			.enumerate()
 			.fold(
@@ -181,13 +196,6 @@ impl <F: Field> DynamicMultilinearExtension<F> {
 			);
 	
 		sum
-	}
-	
-	pub fn poly_constant(c: F) -> SparsePolynomial<F, SparseTerm> {
-		SparsePolynomial::from_coefficients_vec(
-			0, 
-			vec![(c, SparseTerm::new(vec![]))]
-		)
 	}
 	
 	pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
