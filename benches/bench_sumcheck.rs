@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use ark_ff::Field;
+use criterion::measurement::WallTime;
 use thaler::lagrange::{MultilinearExtension};
 use thaler::mles::dynamic_mle::DynamicMultilinearExtension;
 use thaler::mles::poly_mle::PolyMultilinearExtension;
@@ -8,7 +9,7 @@ use thaler::mles::stream_mle::StreamMultilinearExtension;
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
 use thaler::triangles::{TriangleMLE, TriangleGraph};
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
 
 type TestField = F251;
 
@@ -27,23 +28,13 @@ fn build_gi_lookup<F, E>(g: &TriangleMLE<F, E>) -> Vec<sumcheck::UniPoly<F>> whe
 	lookup
 }
 
-fn bench_verifier_steps<F, E>(c: &mut Criterion, eval_type: &str) where F: Field, E: MultilinearExtension<F> {
-	let mut group = c.benchmark_group("verifier");
+fn bench_verifier_steps<'a, F, E>(mut group: BenchmarkGroup<'a, WallTime>, eval_type: &'a str) -> BenchmarkGroup<'a, WallTime> where F: Field, E: MultilinearExtension<F> {
 
 	let matrix_sizes = [4, 8, 16, 32];
 
 	for size in matrix_sizes {
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
-
 		let num_vars = matrix.one_dimension_size() * 3;
-		group.bench_function(
-			BenchmarkId::new::<&str, usize>("count triangles in vars", num_vars), 
-			|b| {
-				b.iter(|| {
-					matrix.count()
-				});
-			}
-		);
 
 		let g: TriangleMLE<F, E> = matrix.derive_mle();
 		let p: Prover<F, TriangleMLE<F, E>> = sumcheck::Prover::new(&g.clone());
@@ -56,7 +47,7 @@ fn bench_verifier_steps<F, E>(c: &mut Criterion, eval_type: &str) where F: Field
 		assert_eq!(num_vars, lookup.len());
 		
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>(&format!("verifier with eval {:?} in vars", eval_type), lookup.len()), 
+			BenchmarkId::new::<&str, usize>(&format!("verifier with mle algo {:?} in vars", eval_type), lookup.len()), 
 			|b| {
 				b.iter(|| {
 					let mut v = v.clone();
@@ -70,27 +61,48 @@ fn bench_verifier_steps<F, E>(c: &mut Criterion, eval_type: &str) where F: Field
 		);
 	}
 
-	group.finish()
+	group
+
 }
 
 fn benchmarks(c: &mut Criterion) {
-	// bench_verifier_steps::<TestField, SlowMultilinearExtension<TestField>>(c, "slow");
-	// bench_verifier_steps::<TestField, StreamMultilinearExtension<TestField>>(c, "stream");
-	bench_verifier_steps::<TestField, DynamicMultilinearExtension<TestField>>(c, "dynamic");
-	// bench_verifier_steps::<TestField, PolyMultilinearExtension<TestField>>(c, "polynomial");
+	let mut group = c.benchmark_group("verifier");
+	let matrix_sizes = [4, 8, 16, 32];
 
-	bench_prover_lookup_build(c);
+	for size in matrix_sizes {
+		let matrix = TriangleGraph::<TestField>::new(thaler::utils::gen_matrix(size));
+
+		let num_vars = matrix.one_dimension_size() * 3;
+		group.bench_function(
+			BenchmarkId::new::<&str, usize>("count triangles in vars", num_vars), 
+			|b| {
+				b.iter(|| {
+					matrix.count()
+				});
+			}
+		);
+	}
+	group = bench_verifier_steps::<TestField, SlowMultilinearExtension<TestField>>(group, "slow");
+	group = bench_verifier_steps::<TestField, StreamMultilinearExtension<TestField>>(group, "stream");
+	group = bench_verifier_steps::<TestField, DynamicMultilinearExtension<TestField>>(group, "dynamic");
+	group = bench_verifier_steps::<TestField, PolyMultilinearExtension<TestField>>(group, "polynomial");
+	group.finish();
+
+	let mut group = c.benchmark_group("prover");
+	group = bench_prover_lookup_build::<TestField, SlowMultilinearExtension<TestField>>(group, "slow");
+	group = bench_prover_lookup_build::<TestField, StreamMultilinearExtension<TestField>>(group, "stream");
+	group = bench_prover_lookup_build::<TestField, DynamicMultilinearExtension<TestField>>(group, "dynamic");
+	group = bench_prover_lookup_build::<TestField, PolyMultilinearExtension<TestField>>(group, "polynomial");
+	group.finish();
 }
 
-fn bench_prover_lookup_build(c: &mut Criterion) {
-	let mut group = c.benchmark_group("prover");
-
-	let matrix_sizes = [4, 8, 16, 32];
+fn bench_prover_lookup_build<'a, F, E>(mut group: BenchmarkGroup<'a, WallTime>, eval_type: &'a str) -> BenchmarkGroup<'a, WallTime> where F: Field, E: MultilinearExtension<F> {
+	let matrix_sizes = [4, 8, 16];
 	for size in matrix_sizes {
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(size));
-		let g: TriangleMLE<TestField, DynamicMultilinearExtension<TestField>> = matrix.derive_mle();
+		let g: TriangleMLE<F, E> = matrix.derive_mle();
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>("prover for size", size), 
+			BenchmarkId::new::<&str, usize>(&format!("prover with mle algo {:?} in matrix size", eval_type), size), 
 			|b| {
 				b.iter(|| {
 					build_gi_lookup(&g);
@@ -98,7 +110,7 @@ fn bench_prover_lookup_build(c: &mut Criterion) {
 			}
 		);
 	}
-	group.finish();
+	group
 }
 
 criterion_group!(benches, benchmarks);
