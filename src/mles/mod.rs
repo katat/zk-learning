@@ -1,4 +1,5 @@
-pub mod slow_mle;
-pub mod stream_mle;
-pub mod dynamic_mle;
-pub mod poly_mle;
+mod poly_mle;
+pub mod value_mle;
+
+pub use poly_mle::PolyMultilinearExtension;
+pub use value_mle::ValueBasedMultilinearExtension;

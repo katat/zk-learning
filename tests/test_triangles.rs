@@ -6,7 +6,10 @@ use thaler::{
     small_fields::F251, 
     triangles::{TriangleGraph, TriangleMLE}, 
     utils::convert_field, 
-    mles::dynamic_mle::DynamicMultilinearExtension
+    mles::{
+        ValueBasedMultilinearExtension, 
+        value_mle::{methods::DynamicEvaluationMethod}
+    }, 
 };
 use thaler::sumcheck::SumCheckPolynomial;
 
@@ -56,7 +59,7 @@ fn var_fixed_evaluate_test() {
         1, 0, 
     ]);
     let matrix = TriangleGraph::new(m.to_vec());
-    let mut triangle: TriangleMLE<TestField, DynamicMultilinearExtension<TestField>> = matrix.derive_mle();
+    let triangle: TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>> = matrix.derive_mle();
     let point = convert_field(&[/*x*/0,/*y*/0,/*z*/1]);
     let p = triangle.var_fixed_evaluate(0, point);
     println!("poly {:?}", p);

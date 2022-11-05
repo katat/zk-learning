@@ -1,10 +1,9 @@
 use std::rc::Rc;
 
 use ark_ff::{Field};
-use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm, Term};
+use ark_poly::polynomial::multivariate::{SparsePolynomial, SparseTerm};
 use ark_poly::polynomial::univariate::SparsePolynomial as UniSparsePolynomial;
 use ark_poly::polynomial::{Polynomial};
-use ark_std::cfg_into_iter;
 use rand::Rng;
 
 // refactor field to be generic
@@ -31,23 +30,6 @@ pub trait SumCheckPolynomial<F> where F: Field {
     fn evaluate(&self, point: &Vec<F>) -> F;
 }
 
-impl <F: Field> SumCheckPolynomial<F> for MultiPoly<F> {
-    // fn terms(&self) -> Vec<(F, SparseTerm)> {
-	// 	self.terms.to_vec()
-    // }
-
-    fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
-        todo!();
-    }
-
-    fn num_vars(&self) -> usize {
-		self.num_vars
-    }
-
-    fn evaluate(&self, point: &Vec<F>) -> F {
-        Polynomial::evaluate(self, point)
-    }
-}
 
 // Simulates memory of a single prover instance
 #[derive(Debug, Clone)]
@@ -164,11 +146,12 @@ impl <F: Field, P: SumCheckPolynomial<F>> Prover<F, P> where P: Clone {
 			UniPoly::from_coefficients_vec(vec![(0, 0u32.into())]),
 			|sum, n| {
 				let point = n_to_vec(n as usize, v);
-				let gj = self.evaluate_gj(point.clone());
+				let gj = self.evaluate_gj(point);
 				sum + gj
 			},
 		)
 	}
+
 	// Evaluates gj over a vector permutation of points, folding all evaluated terms together into one univariate polynomial
 	pub fn evaluate_gj(&self, points: Vec<F>) -> UniPoly<F> {
 		self.g.var_fixed_evaluate(self.r_vec.len(), [self.r_vec.to_vec(), points].concat())

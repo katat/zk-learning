@@ -1,18 +1,20 @@
+use std::marker::PhantomData;
 use ark_ff::{Field};
-
-use crate::{lagrange::MultilinearExtension, sumcheck::UniPoly, utils::n_to_vec};
+use crate::{lagrange::{MultilinearExtension, EvaluationMethod}, sumcheck::UniPoly};
 
 #[derive(Debug, Clone)]
-pub struct StreamMultilinearExtension<F: Field> {
+pub struct ValueBasedMultilinearExtension<F: Field, E: EvaluationMethod<F>> {
 	evals: Vec<F>,
     indexes: Vec<usize>,
+	phantom: PhantomData<E>
 }
 
-impl <F: Field> MultilinearExtension<F> for StreamMultilinearExtension<F> {
+impl <F: Field, E: EvaluationMethod<F>> MultilinearExtension<F> for ValueBasedMultilinearExtension<F, E> {
 	fn new(evals: Vec<F>, indexes: Option<Vec<usize>>) -> Self {
-		StreamMultilinearExtension {
+		ValueBasedMultilinearExtension {
 			evals,
-			indexes: indexes.unwrap()
+			indexes: indexes.unwrap(),
+			phantom: PhantomData,
 		}
 	}
 
@@ -53,8 +55,7 @@ impl <F: Field> MultilinearExtension<F> for StreamMultilinearExtension<F> {
 	}
 
 	fn evaluate(&self, point: &Vec<F>) -> F {
-        let p: Vec<F> = self.indexes.iter().map(|i| point[*i]).collect();
-		self.stream_eval(&p)
+        E::run(&self.evals, &self.indexes, point)
 	}
 
 	fn to_evals(&self) -> Vec<F> {
@@ -98,33 +99,17 @@ impl <F: Field> MultilinearExtension<F> for StreamMultilinearExtension<F> {
 
 }
 
-impl <F: Field> StreamMultilinearExtension<F> {
-	// One step in chi
-	pub fn chi_step(w: bool, x: F) -> F {
-		x * F::from(w) + (F::one() - x) * (F::one() - F::from(w))
-	}
-	
-	// Computes Chi_w(r) for all w, O(log n) operations
-	pub fn chi_w(w: &Vec<bool>, r: &Vec<F>) -> F {
-		assert_eq!(w.len(), r.len());
-		let product: F = w
-			.iter()
-			.zip(r.iter())
-			.map(|(&w, &r)| Self::chi_step(w, r))
-			.product();
-		product
-	}
-	
-	// Lemma 3.7
-	pub fn stream_eval(&self, r: &Vec<F>) -> F {
-		Self::recurse(&self.evals, r, 2usize.pow(r.len() as u32))
-	}
-	
-	pub fn recurse(fw: &Vec<F>, r: &Vec<F>, n: usize) -> F {
-		match n {
-			0 => F::zero(),
-			_ => Self::recurse(fw, r, n - 1) + fw[n - 1] * Self::chi_w(&n_to_vec(n - 1, r.len()), r),
-		}
-	}
-	
+pub fn chi_step<F: Field>(w: bool, x: F) -> F {
+	x * F::from(w) + (F::one() - x) * (F::one() - F::from(w))
+}
+
+// Computes Chi_w(r) for all w, O(log n) operations
+pub fn chi_w<F: Field>(w: &Vec<bool>, r: &Vec<F>) -> F {
+	assert_eq!(w.len(), r.len());
+	let product: F = w
+		.iter()
+		.zip(r.iter())
+		.map(|(&w, &r)| chi_step(w, r))
+		.product();
+	product
 }

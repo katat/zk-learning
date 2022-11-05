@@ -11,3 +11,7 @@ pub trait MultilinearExtension<F>: Clone {
 	fn interpolate(&self) -> UniPoly<F> where F: Field;
 }
 
+pub trait EvaluationMethod<F>: Clone {
+	fn run(evals: &Vec<F>, var_indexes: &Vec<usize>, point: &Vec<F>) -> F;
+}
+

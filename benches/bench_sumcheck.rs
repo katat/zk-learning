@@ -2,10 +2,17 @@ use std::rc::Rc;
 use ark_ff::Field;
 use criterion::measurement::WallTime;
 use thaler::lagrange::{MultilinearExtension};
-use thaler::mles::dynamic_mle::DynamicMultilinearExtension;
-use thaler::mles::poly_mle::PolyMultilinearExtension;
-use thaler::mles::slow_mle::SlowMultilinearExtension;
-use thaler::mles::stream_mle::StreamMultilinearExtension;
+use thaler::mles::{
+	value_mle::{
+		ValueBasedMultilinearExtension,
+		methods::{
+			DynamicEvaluationMethod,
+			SlowEvaluationMethod,
+			StreamEvaluationMethod,
+		}
+	},
+	PolyMultilinearExtension
+};
 use thaler::small_fields::{F251};
 use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
 use thaler::triangles::{TriangleMLE, TriangleGraph};
@@ -18,7 +25,7 @@ fn build_gi_lookup<F, E>(g: &TriangleMLE<F, E>) -> Vec<sumcheck::UniPoly<F>> whe
 	let r: Option<F> = Some(1u32.into());
 	let mut lookup= vec![];
 	let mut p: Prover<F, TriangleMLE<F, E>> = sumcheck::Prover::<F, TriangleMLE<F, E>>::new(g);
-	// OVERHEAD
+
 	let mut gi = p.gen_uni_polynomial(None);
 	lookup.push(gi.clone());
 	for _ in 1..p.g.num_vars() {
@@ -82,16 +89,16 @@ fn benchmarks(c: &mut Criterion) {
 			}
 		);
 	}
-	group = bench_verifier_steps::<TestField, SlowMultilinearExtension<TestField>>(group, "slow");
-	group = bench_verifier_steps::<TestField, StreamMultilinearExtension<TestField>>(group, "stream");
-	group = bench_verifier_steps::<TestField, DynamicMultilinearExtension<TestField>>(group, "dynamic");
+	group = bench_verifier_steps::<TestField, ValueBasedMultilinearExtension<TestField, SlowEvaluationMethod>>(group, "slow");
+	group = bench_verifier_steps::<TestField, ValueBasedMultilinearExtension<TestField, StreamEvaluationMethod>>(group, "stream");
+	group = bench_verifier_steps::<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>>(group, "dynamic");
 	group = bench_verifier_steps::<TestField, PolyMultilinearExtension<TestField>>(group, "polynomial");
 	group.finish();
 
 	let mut group = c.benchmark_group("prover");
-	group = bench_prover_lookup_build::<TestField, SlowMultilinearExtension<TestField>>(group, "slow");
-	group = bench_prover_lookup_build::<TestField, StreamMultilinearExtension<TestField>>(group, "stream");
-	group = bench_prover_lookup_build::<TestField, DynamicMultilinearExtension<TestField>>(group, "dynamic");
+	group = bench_prover_lookup_build::<TestField, ValueBasedMultilinearExtension<TestField, SlowEvaluationMethod>>(group, "slow");
+	group = bench_prover_lookup_build::<TestField, ValueBasedMultilinearExtension<TestField, StreamEvaluationMethod>>(group, "stream");
+	group = bench_prover_lookup_build::<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>>(group, "dynamic");
 	group = bench_prover_lookup_build::<TestField, PolyMultilinearExtension<TestField>>(group, "polynomial");
 	group.finish();
 }

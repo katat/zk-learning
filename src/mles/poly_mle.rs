@@ -1,6 +1,5 @@
 use ark_ff::{Field, Zero};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, DenseMVPolynomial, Polynomial};
-use ark_std::cfg_into_iter;
 
 use crate::{lagrange::MultilinearExtension, sumcheck::{UniPoly, MultiPoly}, utils::n_to_vec};
 
@@ -9,7 +8,6 @@ pub struct PolyMultilinearExtension<F: Field> {
 	evals: Vec<F>,
 	p: MultiPoly<F>,
 	u: Option<UniPoly<F>>,
-	indexes: Vec<usize>,
 }
 
 impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
@@ -17,28 +15,18 @@ impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 		// println!("indexes {:?}", indexes);
 		PolyMultilinearExtension {
 			evals: evals.clone(),
-			p: Self::poly_slow_mle(&evals, &indexes.clone().unwrap()),
+			p: Self::poly_slow_mle(&evals, &indexes.unwrap()),
 			u: None,
-			indexes: indexes.unwrap(),
 		}
 	}
 
 	fn fix_vars(&mut self, fixed_vars: &[usize], partial_point: Vec<F>) {
 		let point = partial_point;
-		// println!("indexes {:?}", self.indexes);
-		// println!("partial point {:?}", partial_point);
-		// println!("point {:?}", point);
-		// println!("p {:?}", self.p);
-		// println!("var {:?}", fixed_vars);
 
-		match fixed_vars.len() {
-			0 => {
-				let e = self.p.evaluate(&point);
-				self.u = Some(UniPoly::from_coefficients_vec(vec![(0, e)]));
-				return
-			}
-			_ => {
-			}
+		if fixed_vars.is_empty() {
+			let e = self.p.evaluate(&point);
+			self.u = Some(UniPoly::from_coefficients_vec(vec![(0, e)]));
+			return
 		}
 
 		let p = self.p.terms.clone().into_iter().fold(
@@ -97,22 +85,6 @@ impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 }
 
 impl <F: Field> PolyMultilinearExtension<F> {
-	fn convert_partial_point(&self, point: Vec<F>) -> Vec<F> {
-		let mut j = 0;
-		let max_var = *self.indexes.iter().max().unwrap();
-		let mut p = point;
-		for i in 0..max_var {
-			if i != self.indexes[j] {
-				p.splice(i..i, vec![F::zero()].iter().cloned());
-			}
-			else {
-				j += 1;
-			}
-		}
-
-		p
-	}
-
 	pub fn poly_constant(c: F) -> SparsePolynomial<F, SparseTerm> {
 		SparsePolynomial::from_coefficients_vec(
 			0, 

@@ -7,9 +7,15 @@ use rstest::rstest;
 use thaler::{
 	lagrange::{self, MultilinearExtension}, 
 	mles::{
-		slow_mle::SlowMultilinearExtension, 
-		dynamic_mle::DynamicMultilinearExtension, 
-		stream_mle::StreamMultilinearExtension, poly_mle::PolyMultilinearExtension,
+		value_mle::{
+			ValueBasedMultilinearExtension, 
+			methods::{
+				SlowEvaluationMethod, 
+				DynamicEvaluationMethod, 
+				StreamEvaluationMethod
+			}
+		},
+		PolyMultilinearExtension,
 	},
 	utils::{convert_field, n_to_vec}, 
 	sumcheck::UniPoly
@@ -44,7 +50,7 @@ fn slow_lagrange_test(
 	#[case] expected: TestField,
 ) {
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
-	let mle: SlowMultilinearExtension<TestField> = lagrange::MultilinearExtension::new(fw.clone(), indexes);
+	let mle: ValueBasedMultilinearExtension<TestField, SlowEvaluationMethod> = lagrange::MultilinearExtension::new(fw.clone(), indexes);
 	assert_eq!(mle.evaluate(r), expected);
 }
 
@@ -52,7 +58,7 @@ fn slow_lagrange_test(
 fn t() {
 	let evals = convert_field(&[2, 4, 3, 2]);
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
-	let mle: DynamicMultilinearExtension<TestField> = lagrange::MultilinearExtension::new(evals, indexes);
+	let mle: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = lagrange::MultilinearExtension::new(evals, indexes);
 	let result: TestField = mle.evaluate(&convert_field(&[0, 0]));
 	assert_eq!(result, TestField::from(2));
 	let result: TestField = mle.evaluate(&convert_field(&[0, 1]));
@@ -85,12 +91,12 @@ fn test_fix_vars() {
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
 
 	// full point
-	let mut mle0: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), indexes.clone());
+	let mut mle0: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
 	mle0.fix_vars(&[], convert_field(&[0, 1]));
 	assert_eq!(mle0.to_evals(), convert_field(&[4]));
 
 	// x1
-	let mut mle1: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), indexes.clone());
+	let mut mle1: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
 	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
 	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
 
@@ -99,7 +105,7 @@ fn test_fix_vars() {
 	assert_eq!(mle1.interpolate().evaluate(&TestField::zero()), TestField::from(4));
 
 	// x1 replace full point
-	let mut mle1: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), indexes.clone());
+	let mut mle1: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
 	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
 	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
 
@@ -114,7 +120,7 @@ fn test_fix_vars() {
 	assert_eq!(uni.evaluate(&TestField::one()), mle0.to_evals()[0]);
 
 	// x0
-	let mut mle2: DynamicMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), indexes.clone());
+	let mut mle2: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
 	mle2.fix_vars(&[0], [TestField::zero(), TestField::zero()].to_vec());
 	assert_eq!(mle2.to_evals(), convert_field(&[2, 3]));
 
@@ -141,8 +147,8 @@ fn stream_lagrange_test(
 	#[case] expected: TestField,
 ) {
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
-	let mle: StreamMultilinearExtension<TestField> = MultilinearExtension::new(fw.clone(), indexes);
-	assert_eq!(mle.stream_eval(r), expected);
+	let mle: ValueBasedMultilinearExtension<TestField, StreamEvaluationMethod> = MultilinearExtension::new(fw.clone(), indexes);
+	assert_eq!(mle.evaluate(r), expected);
 }
 
 #[rstest]
@@ -156,14 +162,7 @@ fn dynamic_mle_test(
 	#[case] expected: TestField,
 ) {
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
-	let mle = DynamicMultilinearExtension::new(fw.clone(), indexes);
-	assert_eq!(mle.dynamic_eval(r), expected);
+	let mle: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(fw.clone(), indexes);
+	assert_eq!(mle.evaluate(r), expected);
 }
 
-#[rstest]
-#[case(&R_4, &R_4_CHI)]
-#[case(&R_5,&R_5_CHI)]
-#[case(&R_6, &R_6_CHI)]
-fn memoize_test(#[case] r: &Vec<TestField>, #[case] expected: &Vec<TestField>) {
-	assert_eq!(DynamicMultilinearExtension::memoize(r, r.len()), *expected);
-}
