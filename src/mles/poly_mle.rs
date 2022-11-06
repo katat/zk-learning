@@ -1,7 +1,7 @@
 use ark_ff::{Field, Zero};
 use ark_poly::{multivariate::{SparsePolynomial, SparseTerm, Term}, DenseMVPolynomial, Polynomial};
 
-use crate::{lagrange::MultilinearExtension, sumcheck::{UniPoly, MultiPoly}, utils::n_to_vec};
+use crate::{lagrange::{MultilinearExtension, MultiPoly, UniPoly}, utils::n_to_vec};
 
 #[derive(Debug, Clone)]
 pub struct PolyMultilinearExtension<F: Field> {

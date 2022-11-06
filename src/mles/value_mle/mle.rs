@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 use ark_ff::{Field};
-use crate::{lagrange::{MultilinearExtension, EvaluationMethod}, sumcheck::UniPoly};
+use crate::{lagrange::{MultilinearExtension, EvaluationMethod, UniPoly}};
 
 #[derive(Debug, Clone)]
 pub struct ValueBasedMultilinearExtension<F: Field, E: EvaluationMethod<F>> {

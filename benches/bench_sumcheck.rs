@@ -1,7 +1,6 @@
-use std::rc::Rc;
 use ark_ff::Field;
 use criterion::measurement::WallTime;
-use thaler::lagrange::{MultilinearExtension};
+use thaler::lagrange::{MultilinearExtension, UniPoly};
 use thaler::mles::{
 	value_mle::{
 		ValueBasedMultilinearExtension,
@@ -14,14 +13,14 @@ use thaler::mles::{
 	PolyMultilinearExtension
 };
 use thaler::small_fields::{F251};
-use thaler::sumcheck::{self, SumCheckPolynomial, Prover, UniPoly, Verifier};
+use thaler::sumcheck::{self, SumCheckPolynomial, Prover, Verifier};
 use thaler::triangles::{TriangleMLE, TriangleGraph};
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId, BenchmarkGroup};
 
 type TestField = F251;
 
 // a gi lookup table
-fn build_gi_lookup<F, E>(g: &TriangleMLE<F, E>) -> Vec<sumcheck::UniPoly<F>> where F: Field, E: MultilinearExtension<F> {
+fn build_gi_lookup<F, E>(g: &TriangleMLE<F, E>) -> Vec<UniPoly<F>> where F: Field, E: MultilinearExtension<F> {
 	let r: Option<F> = Some(1u32.into());
 	let mut lookup= vec![];
 	let mut p: Prover<F, TriangleMLE<F, E>> = sumcheck::Prover::<F, TriangleMLE<F, E>>::new(g);
@@ -44,11 +43,10 @@ fn bench_verifier_steps<'a, F, E>(mut group: BenchmarkGroup<'a, WallTime>, eval_
 		let num_vars = matrix.one_dimension_size() * 3;
 
 		let g: TriangleMLE<F, E> = matrix.derive_mle();
-		let p: Prover<F, TriangleMLE<F, E>> = sumcheck::Prover::new(&g.clone());
-		let g_sum = p.slow_sum_g();
+		let g_sum = g.hypercube_sum();
 		let lookup = build_gi_lookup(&g);
 	
-		let mut v: Verifier<F, UniPoly<F>, TriangleMLE<F, E>> = Verifier::new(g_sum, Rc::new(g.clone()));
+		let mut v: Verifier<F, UniPoly<F>, TriangleMLE<F, E>> = Verifier::new(g_sum, g.clone());
 		v.random_func(|| F::one());
 
 		assert_eq!(num_vars, lookup.len());

@@ -9,9 +9,10 @@ use thaler::{
     mles::{
         ValueBasedMultilinearExtension, 
         value_mle::{methods::DynamicEvaluationMethod}
-    }, 
+    }, lagrange::UniPoly, 
 };
 use thaler::sumcheck::SumCheckPolynomial;
+use ark_poly::polynomial::Polynomial;
 
 type TestField = F251;
 
@@ -61,6 +62,6 @@ fn var_fixed_evaluate_test() {
     let matrix = TriangleGraph::new(m.to_vec());
     let triangle: TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>> = matrix.derive_mle();
     let point = convert_field(&[/*x*/0,/*y*/0,/*z*/1]);
-    let p = triangle.var_fixed_evaluate(0, point);
-    println!("poly {:?}", p);
+    let p: UniPoly<TestField> = triangle.var_fixed_evaluate(0, point);
+    assert_eq!(p.evaluate(&TestField::from(1)), TestField::from(0));
 }

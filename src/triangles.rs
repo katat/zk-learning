@@ -1,6 +1,6 @@
 use std::{iter};
 use ark_ff::{Field};
-use crate::{lagrange::{MultilinearExtension}, sumcheck::{SumCheckPolynomial, UniPoly}};
+use crate::{lagrange::{MultilinearExtension, UniPoly}, sumcheck::{SumCheckPolynomial, n_to_vec}};
 
 #[derive(Debug, Clone)]
 pub struct TriangleGraph <F: Field>  {
@@ -73,31 +73,6 @@ pub struct TriangleMLE <F: Field, E: MultilinearExtension<F>> {
     f_xz: E,
 }
 
-pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
-    let arr: Vec<usize> = (0..var_num).map(|x| x + start_index).collect();
-    arr
-}
-
-pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
-    let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
-    let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
-    let bin = format!("{}{}", xbin, ybin);
-    let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
-        .collect();
-    x
-}
-
-//TODO refactor for more efficient
-pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
-    let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
-    let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
-    let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
-    let bin = format!("{}{}{}", xbin, ybin, zbin);
-    let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
-        .collect();
-    x
-}
-
 impl <F: Field, E: MultilinearExtension<F>> TriangleMLE <F, E> {
     pub fn new(matrix: TriangleGraph<F>) -> Self {
         let a: Vec<F> = matrix.flatten();
@@ -107,12 +82,12 @@ impl <F: Field, E: MultilinearExtension<F>> TriangleMLE <F, E> {
         let y_start_index = var_num;
         let z_start_index = var_num * 2;
         
-        let x_indexes = gen_var_indexes(x_start_index, var_num);
-        let y_indexes = gen_var_indexes(y_start_index, var_num);
+        let x_indexes = Self::gen_var_indexes(x_start_index, var_num);
+        let y_indexes = Self::gen_var_indexes(y_start_index, var_num);
         let mut xy_indexes: Vec<usize> = x_indexes.clone();
         xy_indexes.append(&mut y_indexes.clone());
     
-        let mut z_indexes = gen_var_indexes(z_start_index, var_num);
+        let mut z_indexes = Self::gen_var_indexes(z_start_index, var_num);
     
         let mut yz_indexes: Vec<usize> = y_indexes;
         yz_indexes.append(&mut z_indexes.clone());
@@ -122,23 +97,33 @@ impl <F: Field, E: MultilinearExtension<F>> TriangleMLE <F, E> {
 
         let xy_mle = E::new(a.clone(), Option::Some(xy_indexes.clone()));
         let yz_mle = E::new(a.clone(), Option::Some(yz_indexes.clone()));
-        let xz_mle = E::new(a.clone(), Option::Some(xz_indexes));
+        let xz_mle = E::new(a, Option::Some(xz_indexes));
 
         TriangleMLE {
             matrix,
-            f_xy: xy_mle.clone(),
-            f_yz: yz_mle.clone(),
-            f_xz: xz_mle.clone(),
+            f_xy: xy_mle,
+            f_yz: yz_mle,
+            f_xz: xz_mle,
         }
     }
+
+    fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
+        let arr: Vec<usize> = (0..var_num).map(|x| x + start_index).collect();
+        arr
+    }
+
+    // Sum all evaluations of polynomial `g` over boolean hypercube
+	pub fn hypercube_sum(&self) -> F {
+		let v = self.num_vars();
+		let n = 2u32.pow(v as u32);
+		(0..n)
+			.map(|n| self.evaluate(&n_to_vec(n as usize, v)))
+			.sum()
+	}
 }
 
 impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleMLE<F, E> {
     fn var_fixed_evaluate(&self, var: usize, point: Vec<F>) -> UniPoly<F> {
-        // println!("\x1b[93mpoint {:?}\x1b[0m", point);
-
-        // prepend r_vec
-
         let mut f_xy = self.f_xy.clone();
         let mut f_yz = self.f_yz.clone();
         let mut f_xz = self.f_xz.clone();
@@ -147,42 +132,11 @@ impl <F: Field, E: MultilinearExtension<F>> SumCheckPolynomial<F> for TriangleML
         f_yz.fix_vars(&[var], point.to_vec());
         f_xz.fix_vars(&[var], point.to_vec());
 
-        // println!("xy mle fixed vars, evals {:?}", xy_mle.to_evals());
-        // println!("yz mle fixed vars, evals {:?}", yz_mle.to_evals());
-        // println!("xz mle fixed vars, evals {:?}", xz_mle.to_evals());
-
         let xy_poly = f_xy.interpolate();
         let yz_poly = f_yz.interpolate();
         let xz_poly = f_xz.interpolate();
 
-        // println!("xy poly {:?}", xy_poly);
-        // println!("yz poly {:?}", yz_poly);
-        // println!("xz poly {:?}", xz_poly);
-
         xy_poly.mul(&yz_poly).mul(&xz_poly)
-
-        // let f_xy_unipoly: UniPoly = self.f_xy.terms.clone().into_iter().fold(
-		// 	UniPoly::from_coefficients_vec(vec![]),
-		// 	|sum, term| {
-		// 		let curr = cb(term);
-		// 		sum + curr
-		// 	}
-		// );
-        // let f_yz_unipoly: UniPoly = self.f_yz.terms.clone().into_iter().fold(
-		// 	UniPoly::from_coefficients_vec(vec![]),
-		// 	|sum, term| {
-		// 		let curr = cb(term);
-		// 		sum + curr
-		// 	}
-		// );
-        // let f_xz_unipoly: UniPoly = self.f_xz.terms.clone().into_iter().fold(
-		// 	UniPoly::from_coefficients_vec(vec![]),
-		// 	|sum, term| {
-		// 		let curr = cb(term);
-		// 		sum + curr
-		// 	}
-		// );
-        // f_xy_unipoly.mul(&f_yz_unipoly).mul(&f_xz_unipoly)
     }
 
     fn num_vars(&self) -> usize {

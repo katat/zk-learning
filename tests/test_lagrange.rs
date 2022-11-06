@@ -5,7 +5,7 @@ use ark_ff::{Zero, One};
 use ark_poly::polynomial::Polynomial;
 use rstest::rstest;
 use thaler::{
-	lagrange::{self, MultilinearExtension}, 
+	lagrange::{self, MultilinearExtension, UniPoly}, 
 	mles::{
 		value_mle::{
 			ValueBasedMultilinearExtension, 
@@ -18,7 +18,6 @@ use thaler::{
 		PolyMultilinearExtension,
 	},
 	utils::{convert_field, n_to_vec}, 
-	sumcheck::UniPoly
 };
 use thaler::small_fields::{F5};
 

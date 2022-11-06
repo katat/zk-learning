@@ -1,68 +1,76 @@
 #[macro_use]
 extern crate lazy_static;
 
+use ark_ff::Field;
 use rstest::rstest;
-use thaler::mles::{
+use thaler::{mles::{
 	value_mle::{
 		ValueBasedMultilinearExtension,
 		methods::DynamicEvaluationMethod
 	},
 	PolyMultilinearExtension
-};
+}, sumcheck::{SumCheckPolynomial, Prover, Verifier, Round}, lagrange::UniPoly};
 use thaler::small_fields::{F251};
-use thaler::sumcheck;
 use thaler::triangles::{TriangleMLE, TriangleGraph};
 
 type TestField = F251;
 
-fn convert_vec (m: &[i32]) -> Vec<Vec<TestField>> {
-	let len = (m.len() as f64).sqrt() as usize;
+type DynamicMLE<F> = ValueBasedMultilinearExtension<F, DynamicEvaluationMethod>;
+type TriangleDynamicMLE<F> = TriangleMLE<F, DynamicMLE<F>>;
 
-	let mut matrix = Vec::new();
-	for (i, e) in m.iter().enumerate() {
-		if i % len == 0 {
-			let row = Vec::new();
-			matrix.push(row);
-		}
-		let v = TestField::from(*e);
-		let row = matrix.last_mut().unwrap();
-		
-		row.push(v);
-	}
-
-	matrix
-}
+type PolyMLE<F> = PolyMultilinearExtension<F>;
+type TrianglePolyMLE<F> = TriangleMLE<F, PolyMLE<F>>;
 
 lazy_static! {
 	static ref M: TriangleGraph<TestField> = TriangleGraph::new(thaler::utils::gen_matrix(4));
 
-	static ref G_2: TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>> = M.derive_mle();
-	static ref G_2_SUM: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>>>::new(&G_2).slow_sum_g();
+	static ref G_1: TriangleDynamicMLE<TestField> = M.derive_mle();
+	static ref G_1_SUM: TestField = G_1.hypercube_sum();
 
-	static ref G_3: TriangleMLE<TestField, PolyMultilinearExtension<TestField>> = M.derive_mle();
-	static ref G_3_SUM: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField, PolyMultilinearExtension<TestField>>>::new(&G_3).slow_sum_g();
+	static ref G_2: TrianglePolyMLE<TestField> = M.derive_mle();
+	static ref G_2_SUM: TestField = G_2.hypercube_sum();
+}
 
+fn run_protocol<F: Field, P: SumCheckPolynomial<F>>(g: &P, c: F) -> bool where P: Clone{
+	let mut p = Prover::new(g);
+
+	let mut v: Verifier<F, UniPoly<F>, P> = Verifier::new(c, g.to_owned());
+	while v.current_round != Some(Round::Final()) {
+		let r = v.r_vec.last();
+		let gi = match r {
+			None => p.gen_uni_polynomial(None),
+			_default => p.gen_uni_polynomial(Some(*r.unwrap()))
+		};
+
+		v.verify(Some(gi));
+	}
+
+	// final round
+	v.verify(None);
+	true
+}
+
+#[rstest]
+#[case(&G_1, &G_1_SUM)]
+fn triangle_graph_count_value_mle_test(#[case] p: &TriangleDynamicMLE<TestField>, #[case] c: &TestField) {
+	assert_eq!(p.matrix.count() * TestField::from(6), *c);
 }
 
 #[rstest]
 #[case(&G_2, &G_2_SUM)]
-fn sumcheck_triangles_test(#[case] p: &TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>>, #[case] c: &TestField) {
-	assert!(sumcheck::verify::<_, TriangleMLE<_, ValueBasedMultilinearExtension<_, DynamicEvaluationMethod>>>(p, *c));
+fn triangle_graph_count_poly_mle_test(#[case] p: &TrianglePolyMLE<TestField>, #[case] c: &TestField) {
+	assert_eq!(p.matrix.count() * TestField::from(6), *c);
+}
+
+
+#[rstest]
+#[case(&G_1, &G_1_SUM)]
+fn sumcheck_triangle_dynamic_mle_test(#[case] p: &TriangleDynamicMLE<TestField>, #[case] c: &TestField) {
+	assert!(run_protocol::<_, TriangleDynamicMLE<_>>(p, *c));
 }
 
 #[rstest]
-#[case(&G_3, &G_3_SUM)]
-fn sumcheck_triangles_poly_test(#[case] p: &TriangleMLE<TestField, PolyMultilinearExtension<TestField>>, #[case] c: &TestField) {
-	assert!(sumcheck::verify::<_, TriangleMLE<_, PolyMultilinearExtension<_>>>(p, *c));
+#[case(&G_2, &G_2_SUM)]
+fn sumcheck_triangle_poly_mle_test(#[case] p: &TrianglePolyMLE<TestField>, #[case] c: &TestField) {
+	assert!(run_protocol::<_, TrianglePolyMLE<_>>(p, *c));
 }
-
-#[rstest]
-fn sumcheck_triangles_2_test() {
-	let m = convert_vec(&[0, 1, 1, 0]);
-    let matrix = TriangleGraph::new(m.to_vec());
-	let g: TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>> = matrix.derive_mle();
-	let sum: TestField = sumcheck::Prover::<TestField, TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>>>::new(&g).slow_sum_g();
-
-	assert!(sumcheck::verify::<TestField, TriangleMLE<TestField, ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod>>>(&g, sum));
-}
-

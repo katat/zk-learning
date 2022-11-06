@@ -1,6 +1,9 @@
 use ark_ff::{Field};
-use crate::{sumcheck::UniPoly};
+use ark_poly::multivariate::{SparsePolynomial, SparseTerm};
+use ark_poly::univariate::{SparsePolynomial as UniSparsePolynomial};
 
+pub type MultiPoly<F> = SparsePolynomial<F, SparseTerm>;
+pub type UniPoly<F> = UniSparsePolynomial<F>;
 
 pub trait MultilinearExtension<F>: Clone {
 	fn new(evals: Vec<F>, var_indexes: Option<Vec<usize>>) -> Self;
