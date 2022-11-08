@@ -12,7 +12,6 @@ pub struct PolyMultilinearExtension<F: Field> {
 
 impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 	fn new(evals: Vec<F>, indexes: Option<Vec<usize>>) -> Self {
-		// println!("indexes {:?}", indexes);
 		PolyMultilinearExtension {
 			evals: evals.clone(),
 			p: Self::poly_slow_mle(&evals, &indexes.unwrap()),
@@ -85,13 +84,6 @@ impl <F: Field> MultilinearExtension<F> for PolyMultilinearExtension<F> {
 }
 
 impl <F: Field> PolyMultilinearExtension<F> {
-	pub fn poly_constant(c: F) -> SparsePolynomial<F, SparseTerm> {
-		SparsePolynomial::from_coefficients_vec(
-			0, 
-			vec![(c, SparseTerm::new(vec![]))]
-		)
-	}
-	// One step in chi
 	pub fn poly_chi_step(w: bool, v: usize) -> SparsePolynomial<F, SparseTerm> {
 		let one_minus_w = F::from(1 - (w as u32));
 		let w_minus_one = F::from(w as u32) - F::one();
@@ -111,7 +103,6 @@ impl <F: Field> PolyMultilinearExtension<F> {
 		f
 	}
 	
-	/// Perform a naive n^2 multiplication of `self` by `other`.
 	pub fn naive_mul(
 		cur: &SparsePolynomial<F, SparseTerm>,
 		other: &SparsePolynomial<F, SparseTerm>,
@@ -136,7 +127,6 @@ impl <F: Field> PolyMultilinearExtension<F> {
 		}
 	}
 	
-	// Computes Chi_w(r) for all w, O(log n) operations
 	pub fn poly_chi_w(w: &[bool], vars: &Vec<usize>) -> SparsePolynomial<F, SparseTerm> {
 		let product: SparsePolynomial<F, SparseTerm> = w
 			.iter()
@@ -153,7 +143,6 @@ impl <F: Field> PolyMultilinearExtension<F> {
 		product
 	}
 	
-	// Calculating the slow way, for benchmarking
 	pub fn poly_slow_mle(evals: &Vec<F>, vars: &Vec<usize>) -> SparsePolynomial<F, SparseTerm> {
 		let sum: SparsePolynomial<F, SparseTerm> = evals
 			.iter()
@@ -169,70 +158,4 @@ impl <F: Field> PolyMultilinearExtension<F> {
 		sum
 	}
 	
-	pub fn convert_bin(x: usize, y: usize, n: usize) -> Vec<u32> {
-		let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
-		let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
-		let bin = format!("{}{}", xbin, ybin);
-		let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
-			.collect();
-		x
-	}
-	
-	pub fn convert_bin_z(x: usize, y: usize, z: usize, n: usize) -> Vec<u32> {
-		let xbin = format!("{:0>width$}", format!("{:b}", x), width = n);
-		let ybin = format!("{:0>width$}", format!("{:b}", y), width = n);
-		let zbin = format!("{:0>width$}", format!("{:b}", z), width = n);
-		let bin = format!("{}{}{}", xbin, ybin, zbin);
-		let x: Vec<u32> = bin.chars().map(|x| x.to_digit(10).unwrap())
-			.collect();
-		x
-	}
-	
-	pub fn gen_var_indexes (start_index: usize, var_num: usize) -> Vec<usize> {
-		let arr: Vec<usize> = (0..var_num).map(|x| x + start_index).collect();
-		arr
-	}
-	
-	// One step in chi
-	pub fn chi_step(w: bool, x: F) -> F {
-		x * F::from(w) + (F::one() - x) * (F::one() - F::from(w))
-	}
-	
-	// Computes Chi_w(r) for all w, O(log n) operations
-	pub fn chi_w(w: &Vec<bool>, r: &Vec<F>) -> F {
-		assert_eq!(w.len(), r.len());
-		let product: F = w
-			.iter()
-			.zip(r.iter())
-			.map(|(&w, &r)| Self::chi_step(w, r))
-			.product();
-		product
-	}
-	
-	pub fn dynamic_eval(&self, r: &Vec<F>) -> F {
-		let chi_lookup = Self::memoize(r, r.len());
-		let result: F = self.evals
-			.iter()
-			.zip(chi_lookup.iter())
-			.map(|(left, right)| *left * right)
-			.sum();
-		result
-	}
-	
-	pub fn memoize(r: &Vec<F>, v: usize) -> Vec<F> {
-		match v {
-			1 => {
-				vec![Self::chi_step(false, r[v - 1]), Self::chi_step(true, r[v - 1])]
-			}
-			_ => Self::memoize(r, v - 1)
-				.iter()
-				.flat_map(|val| {
-					[
-						*val * Self::chi_step(false, r[v - 1]),
-						*val * Self::chi_step(true, r[v - 1]),
-					]
-				})
-				.collect(),
-		}
-	}
 }
