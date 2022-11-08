@@ -30,3 +30,8 @@ pub fn n_to_vec(i: usize, n: usize) -> Vec<bool> {
 		.collect();
 	x
 }
+pub fn bools_to_ints(a: Vec<bool>) -> Vec<u32> {
+	a.iter().map(|e| {
+		if *e {1} else {0}
+	}).collect()
+}

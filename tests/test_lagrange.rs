@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-use ark_ff::{Zero, One};
 use ark_poly::polynomial::Polynomial;
 use rstest::rstest;
 use thaler::{
@@ -15,9 +14,8 @@ use thaler::{
 				StreamEvaluationMethod
 			}
 		},
-		PolyMultilinearExtension,
 	},
-	utils::{convert_field, n_to_vec}, 
+	utils::{convert_field, n_to_vec, bools_to_ints}, 
 };
 use thaler::small_fields::{F5};
 
@@ -54,85 +52,88 @@ fn slow_lagrange_test(
 }
 
 #[rstest]
-fn t() {
-	let evals = convert_field(&[2, 4, 3, 2]);
+fn test_evaluate_points() {
+	let evals = convert_field(&[1, 2, 1, 4]);
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
 	let mle: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = lagrange::MultilinearExtension::new(evals, indexes);
 	let result: TestField = mle.evaluate(&convert_field(&[0, 0]));
-	assert_eq!(result, TestField::from(2));
+	assert_eq!(result, TestField::from(1));
 	let result: TestField = mle.evaluate(&convert_field(&[0, 1]));
-	assert_eq!(result, TestField::from(4));
+	assert_eq!(result, TestField::from(2));
 	
 	let result: TestField = mle.evaluate(&convert_field(&[1, 0]));
-	assert_eq!(result, TestField::from(3));
+	assert_eq!(result, TestField::from(1));
 	let result: TestField = mle.evaluate(&convert_field(&[1, 1]));
-	assert_eq!(result, TestField::from(2));
+	assert_eq!(result, TestField::from(4));
 
 
 	let mut sum: TestField = TestField::from(0);
 	for i in 0..4 {
 		let vars = n_to_vec(i, 2);
-		println!("{:?}", vars);
 		let eval = mle.evaluate(&vars.iter().map(|e| TestField::from(*e)).collect());
-		println!("eval {:?}", eval);
 		sum += eval;
 	}
 
-	assert_eq!(sum, TestField::from(11));
-
-	// 2 * 4 * 3 * 2 = 48
-	// [6,8]
+	assert_eq!(sum, TestField::from(8));
 }
 
 #[rstest]
-fn test_fix_vars() {
-	let evals: Vec<TestField> = convert_field(&[2, 4, 3, 2]);
+#[case(&F_2, 0)]
+#[case(&F_2, 1)]
+#[case(&F_2, 2)]
+#[case(&F_2, 3)]
+fn test_fixed_vars_full_point(
+	#[case] f: &Vec<TestField>,
+	#[case] var_index: usize,
+) {
+	let num_vars = (f.len() as f64).log2() as usize;
 	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
 
 	// full point
-	let mut mle0: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
-	mle0.fix_vars(&[], convert_field(&[0, 1]));
-	assert_eq!(mle0.to_evals(), convert_field(&[4]));
+	let mut mle0: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(f.to_vec(), indexes);
+	let point: Vec<u32> = bools_to_ints(n_to_vec(var_index, num_vars));
+	
+	mle0.fix_vars(&[], convert_field(&point));
+	assert_eq!(mle0.to_evals(), vec![f[var_index]]);
 
-	// x1
-	let mut mle1: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
-	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
-	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
-
-	let mut mle1: PolyMultilinearExtension<TestField> = MultilinearExtension::new(evals.clone(), indexes.clone());
-	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
-	assert_eq!(mle1.interpolate().evaluate(&TestField::zero()), TestField::from(4));
-
-	// x1 replace full point
-	let mut mle1: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
-	mle1.fix_vars(&[0], [TestField::zero(), TestField::one()].to_vec());
-	assert_eq!(mle1.to_evals(), convert_field(&[4, 2]));
-
-	// interpolate for non-constant polynomial
-	let uni: UniPoly<TestField> = mle1.interpolate();
-	assert_eq!(uni.evaluate(&TestField::zero()), TestField::from(4));
-
+	// constant polynomial
 	let uni: UniPoly<TestField> = mle0.interpolate();
 	assert_eq!(uni.degree(), 0);
 	assert_eq!(mle0.to_evals().len(), 1);
-	assert_eq!(uni.evaluate(&TestField::zero()), mle0.to_evals()[0]);
-	assert_eq!(uni.evaluate(&TestField::one()), mle0.to_evals()[0]);
 
-	// x0
-	let mut mle2: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(evals.clone(), indexes.clone());
-	mle2.fix_vars(&[0], [TestField::zero(), TestField::zero()].to_vec());
-	assert_eq!(mle2.to_evals(), convert_field(&[2, 3]));
+	for i in 0..F_2.len() {
+		assert_eq!(uni.evaluate(&TestField::from(i as u32)), f[var_index]);
+	}
+}
 
-	// 2 * 4 * 3 * 2
-	// let mle3 = mle1.clone().mul(mle2.clone());
-	// let result = mle3.evaluate(&convert_field(&[0])) * mle3.evaluate(&convert_field(&[1]));
-	// assert_eq!(result, evals[0] * evals[1] * evals[2] * evals[3]);
+#[rstest]
+#[case(&F_2, &vec![0, 0], 0, &vec![1, 1])] // (x, 0) 
+#[case(&F_2, &vec![1, 0], 0, &vec![1, 1])] // (x, 0) 
+#[case(&F_2, &vec![0, 1], 0, &vec![2, 4])] // (x, 1) 
+#[case(&F_2, &vec![1, 1], 0, &vec![2, 4])] // (x, 1) 
+#[case(&F_2, &vec![0, 0], 1, &vec![1, 2])] // (0, y) 
+#[case(&F_2, &vec![0, 1], 1, &vec![1, 2])] // (0, y) 
+#[case(&F_2, &vec![1, 0], 1, &vec![1, 4])] // (1, y) 
+#[case(&F_2, &vec![1, 1], 1, &vec![1, 4])] // (1, y) 
+fn test_fixed_vars(
+	#[case] f: &Vec<TestField>,
+	#[case] xy: &Vec<u32>,
+	#[case] var_index: usize,
+	#[case] fixed_evals: &Vec<u32>,
+) {
+	let indexes: Option<Vec<usize>> = Some(vec![0, 1]);
 
-	// let mle3 = mle1.clone().add(mle2.clone());
-	// let result = mle3.evaluate(&convert_field(&[0])) + mle3.evaluate(&convert_field(&[1]));
-	// assert_eq!(result, evals[0] + evals[1] + evals[2] + evals[3]);
+	let mut mle: ValueBasedMultilinearExtension<TestField, DynamicEvaluationMethod> = MultilinearExtension::new(f.to_vec(), indexes.clone());
+	mle.fix_vars(&[var_index], convert_field(xy));
+	assert_eq!(mle.to_evals(), convert_field(fixed_evals));
 
-	// support 
+	// interpolation
+	for i in 0..fixed_evals.len() {
+		assert_eq!(
+			mle.interpolate().evaluate(&TestField::from(i as u32)), 
+			TestField::from(fixed_evals[i])
+		);
+	}
 }
 
 #[rstest]
