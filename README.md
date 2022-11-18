@@ -1,10 +1,11 @@
-# Thaler Algorithms
+Here are the implementations and benchmarks referenced in the sum-check protocol explained in the [blog posts](https://katat.me/blog/Sum+check+-+overview).
 
-Rust implementation of algorithms in Thaler's Proofs, Arguments and ZK study group. 
-
-### Get Started
+### Tests
 ```rust
 cargo test
-cargo bench
 ```
 
+### Benchmarks
+```rust
+cargo bench
+```
