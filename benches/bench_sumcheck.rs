@@ -25,6 +25,18 @@ type DynamicMLE = ValueBasedMultilinearExtension<TestField, DynamicEvaluationMet
 
 type PolyMLE = PolyMultilinearExtension<TestField>;
 
+fn format_type_name<E>() -> String {
+	std::any::type_name::<E>()
+		.replace("thaler::mles::", "")
+		.replace("poly_mle::", "")
+		.replace("value_mle::", "")
+		.replace("ark_ff::fields::models::fp::Fp<ark_ff::fields::models::fp::montgomery_backend::MontBackend<thaler::small_fields::FrConfigF251, 1>, 1>", "")
+		.replace("<>", "")
+		.replace("mle::", "")
+		.replace("methods::", "")
+		.replace(", ", "")
+}
+
 // a gi lookup table
 fn build_gi_lookup<F, E>(g: &TriangleMLE<F, E>) -> Vec<UniPoly<F>> where F: Field, E: MultilinearExtension<F> {
 	let r: Option<F> = Some(1u32.into());
@@ -56,7 +68,7 @@ fn bench_verifier_steps<'a, E>(mut group: BenchmarkGroup<'a, WallTime>, matrix_s
 		assert_eq!(num_vars, lookup.len());
 		
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>(&format!("verifier with mle algo {:?} in vars", std::any::type_name::<E>()), lookup.len()), 
+			BenchmarkId::new::<&str, usize>(&format!("verifier using {:?} with vars #", format_type_name::<E>()), lookup.len()), 
 			|b| {
 				b.iter(|| {
 					let mut v = v.clone();
@@ -80,7 +92,7 @@ fn bench_prover_lookup_build<'a, E>(mut group: BenchmarkGroup<'a, WallTime>, mat
 		let matrix = TriangleGraph::new(thaler::utils::gen_matrix(*size));
 		let g: TriangleMLE<TestField, E> = matrix.derive_mle();
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>(&format!("prover with mle algo {:?} in matrix size", std::any::type_name::<E>()), *size), 
+			BenchmarkId::new::<&str, usize>(&format!("prover using {:?} with vars #", format_type_name::<E>()), g.num_vars()), 
 			|b| {
 				b.iter(|| {
 					build_gi_lookup(&g);
@@ -98,7 +110,7 @@ fn bench_triangle_graph<'a>(mut group: BenchmarkGroup<'a, WallTime>, matrix_size
 
 		let num_vars = matrix.one_dimension_size() * 3;
 		group.bench_function(
-			BenchmarkId::new::<&str, usize>("triangle graph with vars", num_vars), 
+			BenchmarkId::new::<&str, usize>("triangle graph with vars #", num_vars), 
 			|b| {
 				b.iter(|| {
 					matrix.count()
